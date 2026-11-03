@@ -1,0 +1,10 @@
+# Optional overlay for a reviewed custom archive image. Keep all production data
+# and networking in the existing base Compose file. Do not publish extra ports.
+# docker compose -f docker-compose.yml -f docker-compose.archive.yml up -d --no-deps sub2api
+services:
+  sub2api:
+    image: ${SUB2API_ARCHIVE_IMAGE:?Set an explicitly versioned custom image}
+    environment:
+      - CONVERSATION_ARCHIVE_ENABLED=${CONVERSATION_ARCHIVE_ENABLED:-false}
+      - CONVERSATION_ARCHIVE_MAX_BYTES=${CONVERSATION_ARCHIVE_MAX_BYTES:-1048576}
+      - CONVERSATION_ARCHIVE_RETENTION_DAYS=${CONVERSATION_ARCHIVE_RETENTION_DAYS:-30}
