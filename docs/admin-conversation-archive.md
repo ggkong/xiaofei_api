@@ -84,7 +84,7 @@ DELETE FROM conversation_archives WHERE id IN (
 
 ## GitHub 发布基线的测试夹具清理
 
-仓库密钥保护拦截了上游测试中的静态 PEM 样例。这些样例不是可解析的私钥；为避免静态密钥样式内容进入新仓库，支付、Vertex 及前端账号测试改为运行时生成、仅存于测试进程内的临时 RSA 密钥。生产运行逻辑没有因此修改，保护规则未关闭或绕过。
+上传排查时发现上游测试存在静态 PEM 样例；后续逐文件定位确认，本次密钥保护拦截的根因是内置 OAuth client_secret。这些 PEM 样例不是可解析的私钥；为避免静态密钥样式内容进入新仓库，支付、Vertex 及前端账号测试改为运行时生成、仅存于测试进程内的临时 RSA 密钥。生产运行逻辑没有因此修改，保护规则未关闭或绕过。
 
 发布到 GitHub 的官方版本基线包含这项测试安全清理，并保留上游版本及许可；其源码树不再声称逐字节等同原始官方源码树。功能开发分支继续在该基线上提交。
 
@@ -95,3 +95,9 @@ DELETE FROM conversation_archives WHERE id IN (
 逐文件定位还确认，上游 Antigravity 与 Gemini CLI 模块及部署文档含有内置 OAuth client_secret，触发了仓库保护。已删除源码内置回退和文档中的凭据值，只接受显式配置的授权凭据：`ANTIGRAVITY_OAUTH_CLIENT_SECRET`、`GEMINI_CLI_OAUTH_CLIENT_SECRET`，或 Gemini 自定义 OAuth 客户端配置。缺失配置会返回明确错误，不再自动使用内置密钥。官方 API Key 接入不依赖这些 OAuth 配置。
 
 相关 OAuth 模块及日志脱敏测试全部通过。此项加固会改变上述可选 OAuth 接入的默认行为，发布基线包含该安全修正，不能声称运行代码与原始官方版本完全相同。不要复用旧候选镜像作为这一安全版本；使用当前源码重新构建，例如 `docker build --build-arg VERSION=0.2.19-archive.3 -t sub2api-team:0.2.19-archive.3 .`。
+
+## 远端历史与上线门槛
+
+GitHub 的 main 是清理后的发布基线，feature/admin-conversation-archive 是功能分支。旧上游标签和原始历史仅在本机保留作回退，不要通过 --mirror 或 --tags 将含内置凭据的旧历史发布到新仓库。生产凭据及数据库备份仍只在服务器安全目录中保存。
+
+本地目标测试和编译通过不等于绝对无 bug；生产上线还需要 GitHub CI、安全检查及真实授权上游验证通过。当前 GitHub 前端安全检查尚未通过，生产没有更新。
