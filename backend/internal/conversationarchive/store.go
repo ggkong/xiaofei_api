@@ -122,7 +122,7 @@ func (s *Store) List(ctx context.Context, f Filter) ([]Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	records := make([]Record, 0)
 	for rows.Next() {
 		r, err := scanRecord(rows, false)

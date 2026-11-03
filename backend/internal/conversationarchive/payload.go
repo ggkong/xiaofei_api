@@ -112,12 +112,12 @@ func StreamSnapshotWithCompletion(raw []byte, truncated, complete bool) json.Raw
 		typ, _ := event["type"].(string)
 		if typ == "response.output_text.delta" {
 			if delta, ok := event["delta"].(string); ok {
-				text.WriteString(delta)
+				_, _ = text.WriteString(delta)
 			}
 		}
 		if delta, ok := event["delta"].(map[string]any); ok {
 			if t, ok := delta["text"].(string); ok {
-				text.WriteString(t)
+				_, _ = text.WriteString(t)
 			}
 		}
 		if choices, ok := event["choices"].([]any); ok {
@@ -125,7 +125,7 @@ func StreamSnapshotWithCompletion(raw []byte, truncated, complete bool) json.Raw
 				if choice, ok := c.(map[string]any); ok {
 					if delta, ok := choice["delta"].(map[string]any); ok {
 						if t, ok := delta["content"].(string); ok {
-							text.WriteString(t)
+							_, _ = text.WriteString(t)
 						}
 					}
 				}

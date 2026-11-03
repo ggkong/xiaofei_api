@@ -32,7 +32,7 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer base.Close()
+	defer func() { _ = base.Close() }()
 	var database string
 	if err = base.QueryRow("SELECT current_database()").Scan(&database); err != nil || database != "archive_test" {
 		t.Fatal("refusing to run outside archive_test")
@@ -52,7 +52,7 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { db.Close(); base.Exec("DROP SCHEMA " + schema + " CASCADE") }()
+	defer func() { _ = db.Close(); _, _ = base.Exec("DROP SCHEMA " + schema + " CASCADE") }()
 	if _, err = db.Exec("CREATE TABLE users(id BIGINT PRIMARY KEY); CREATE TABLE api_keys(id BIGINT PRIMARY KEY); INSERT INTO users VALUES(42); INSERT INTO api_keys VALUES(7)"); err != nil {
 		t.Fatal(err)
 	}
@@ -68,9 +68,17 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 	reply := strings.Repeat(chunk, 100) + "data: [DONE]\n\n"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Error("upstream does not support streaming")
+			return
+		}
 		for _, event := range strings.SplitAfter(reply, "\n\n") {
-			io.WriteString(w, event)
-			w.(http.Flusher).Flush()
+			if _, err := io.WriteString(w, event); err != nil {
+				t.Error(err)
+				return
+			}
+			flusher.Flush()
 		}
 	}))
 	defer upstream.Close()
@@ -92,13 +100,16 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 			c.Status(502)
 			return
 		}
-		defer result.Body.Close()
+		defer func() { _ = result.Body.Close() }()
 		c.Header("Content-Type", result.Header.Get("Content-Type"))
 		buf := make([]byte, 73)
 		for {
 			n, readErr := result.Body.Read(buf)
 			if n > 0 {
-				c.Writer.Write(buf[:n])
+				if _, err := c.Writer.Write(buf[:n]); err != nil {
+					t.Error(err)
+					return
+				}
 				c.Writer.Flush()
 			}
 			if readErr != nil {
@@ -135,7 +146,7 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	body, err := io.ReadAll(result.Body)
-	result.Body.Close()
+	_ = result.Body.Close()
 	if err != nil || result.StatusCode != 200 || string(body) != reply {
 		t.Fatal("HTTP relay changed the streamed reply")
 	}
@@ -165,7 +176,7 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		response.Body.Close()
+		_ = response.Body.Close()
 		if response.StatusCode != tc.status {
 			t.Fatalf("%s: got %d want %d", tc.token, response.StatusCode, tc.status)
 		}
@@ -183,7 +194,7 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 	if err = json.NewDecoder(response.Body).Decode(&envelope); err != nil {
 		t.Fatal(err)
 	}
-	response.Body.Close()
+	_ = response.Body.Close()
 	if response.StatusCode != 200 || response.Header.Get("Cache-Control") != "no-store" || !strings.Contains(string(envelope.Data.RequestBody), "question") {
 		t.Fatal("administrator detail read failed")
 	}
@@ -193,7 +204,7 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	response.Body.Close()
+	_ = response.Body.Close()
 	if response.StatusCode != 403 {
 		t.Fatal("ordinary user could delete records")
 	}
@@ -203,7 +214,7 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	response.Body.Close()
+	_ = response.Body.Close()
 	if response.StatusCode != 200 {
 		t.Fatal("administrator delete failed")
 	}

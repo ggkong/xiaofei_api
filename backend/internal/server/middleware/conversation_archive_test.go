@@ -53,7 +53,7 @@ func TestConversationCaptureTracksTerminalsPastLimitAndClientCancellation(t *tes
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer db.Close()
+			defer func() { _ = db.Close() }()
 			store := conversationarchive.New(db, conversationarchive.Options{Enabled: true, MaxBytes: 4096, RetentionDays: 30})
 			isStream := tc.contentType == "text/event-stream"
 			mock.ExpectExec("INSERT INTO conversation_archives").WithArgs(sqlmock.AnyArg(), int64(42), int64(7), "", "/v1/chat/completions", "test", isStream, 200, tc.status,
@@ -68,14 +68,18 @@ func TestConversationCaptureTracksTerminalsPastLimitAndClientCancellation(t *tes
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			r.POST("/v1/chat/completions", func(c *gin.Context) {
-				io.ReadAll(c.Request.Body)
+				if _, err := io.ReadAll(c.Request.Body); err != nil {
+					t.Fatal(err)
+				}
 				c.Header("Content-Type", tc.contentType)
 				for i := 0; i < len(tc.body); i += 7 {
 					end := i + 7
 					if end > len(tc.body) {
 						end = len(tc.body)
 					}
-					c.Writer.WriteString(tc.body[i:end])
+					if _, err := c.Writer.WriteString(tc.body[i:end]); err != nil {
+						t.Fatal(err)
+					}
 				}
 				if tc.cancelled {
 					cancel()
@@ -145,7 +149,7 @@ func TestConversationCapturePreservesStreamingAndSurvivesStorageFailure(t *testi
 		if err := mock.ExpectationsWereMet(); err != nil {
 			t.Fatal(err)
 		}
-		db.Close()
+		_ = db.Close()
 	}
 }
 

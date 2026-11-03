@@ -22,7 +22,7 @@ func TestStorePostgresLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	var database string
 	if err = db.QueryRow(`SELECT current_database()`).Scan(&database); err != nil {
 		t.Fatal(err)
