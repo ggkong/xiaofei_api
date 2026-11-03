@@ -49,13 +49,15 @@ type Record struct {
 }
 
 type Filter struct {
-	UserID    int64
-	APIKeyID  int64
-	Model     string
-	SessionID string
-	Status    string
-	BeforeID  int64
-	Limit     int
+	UserID       int64
+	APIKeyID     int64
+	Model        string
+	SessionID    string
+	Status       string
+	BeforeID     int64
+	Limit        int
+	CreatedFrom  *time.Time
+	CreatedUntil *time.Time
 }
 
 type Store struct {
@@ -114,7 +116,9 @@ func (s *Store) List(ctx context.Context, f Filter) ([]Record, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+metadataColumns+` FROM conversation_archives
  WHERE expires_at > NOW() AND ($1::bigint=0 OR user_id=$1) AND ($2::bigint=0 OR api_key_id=$2)
  AND ($3::text='' OR model=$3) AND ($4::text='' OR session_id=$4) AND ($5::text='' OR status=$5)
- AND ($6::bigint=0 OR id<$6) ORDER BY id DESC LIMIT $7`, f.UserID, f.APIKeyID, f.Model, f.SessionID, f.Status, f.BeforeID, f.Limit)
+ AND ($6::bigint=0 OR id<$6)
+ AND ($8::timestamptz IS NULL OR created_at >= $8) AND ($9::timestamptz IS NULL OR created_at < $9)
+ ORDER BY id DESC LIMIT $7`, f.UserID, f.APIKeyID, f.Model, f.SessionID, f.Status, f.BeforeID, f.Limit, f.CreatedFrom, f.CreatedUntil)
 	if err != nil {
 		return nil, err
 	}

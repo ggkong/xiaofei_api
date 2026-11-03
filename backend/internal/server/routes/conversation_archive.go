@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Wei-Shaw/sub2api/internal/conversationarchive"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/adminaccess"
@@ -45,10 +47,24 @@ func registerConversationArchiveRoutes(admin *gin.RouterGroup, store *conversati
 			}
 		}
 		f.Model = c.Query("model")
+		for name, target := range map[string]**time.Time{"created_from": &f.CreatedFrom, "created_until": &f.CreatedUntil} {
+			if value := c.Query(name); value != "" {
+				timestamp, err := time.Parse(time.RFC3339Nano, value)
+				if err != nil || timestamp.Year() < 1 {
+					response.BadRequest(c, "Invalid "+name+"; use RFC3339 with a timezone")
+					return
+				}
+				*target = &timestamp
+			}
+		}
+		if f.CreatedFrom != nil && f.CreatedUntil != nil && !f.CreatedFrom.Before(*f.CreatedUntil) {
+			response.BadRequest(c, "created_until must be after created_from")
+			return
+		}
 		f.SessionID = c.Query("session_id")
 		f.Status = c.Query("status")
-		if len([]rune(f.Model)) > 255 || len([]rune(f.SessionID)) > 255 {
-			response.BadRequest(c, "Filter too long")
+		if len([]rune(f.Model)) > 255 || len([]rune(f.SessionID)) > 255 || !utf8.ValidString(f.Model+f.SessionID) || strings.ContainsRune(f.Model+f.SessionID, 0) {
+			response.BadRequest(c, "Invalid model or session filter")
 			return
 		}
 		if f.Status != "" && f.Status != "complete" && f.Status != "error" && f.Status != "interrupted" {

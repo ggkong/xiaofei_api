@@ -29,8 +29,22 @@ export default {
     "deleteConfirm": "确定永久删除这条对话记录？",
     "loadError": "无法读取记录，请检查管理员权限和服务状态。",
     "noSession": "独立请求",
-    "limitNotice": "内容超过保存上限，部分内容已省略，原始请求转发不受影响。"
+    "limitNotice": "内容超过保存上限，部分内容已省略，原始请求转发不受影响。",
+    "from": "开始时间",
+    "until": "结束时间（不含）",
+    "invalidRange": "请选择有效的时间范围，结束时间必须晚于开始时间。",
+    "raw": "展开原始结构与工具调用",
+    "noText": "没有可显示的文本；工具调用、媒体省略或内容受限详情可在原始结构中查看。",
+    "roles": {
+        "system": "系统",
+        "developer": "开发者",
+        "user": "用户",
+        "assistant": "模型回复",
+        "tool": "工具结果",
+        "message": "消息"
+    }
 },
+
   common: {
     loading: '加载中...',
     submitting: '提交中...',

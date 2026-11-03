@@ -3,6 +3,7 @@ package conversationarchive
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"strings"
 )
 
@@ -10,7 +11,7 @@ import (
 // Invalid or oversized bodies are omitted in full, never stored as raw previews.
 func Snapshot(raw []byte, truncated bool) json.RawMessage {
 	var value any
-	if truncated || json.Unmarshal(raw, &value) != nil {
+	if truncated || !decodeJSON(raw, &value) {
 		return json.RawMessage(`{"omitted":true}`)
 	}
 	data, err := json.Marshal(sanitize(value, 0))
@@ -18,6 +19,25 @@ func Snapshot(raw []byte, truncated bool) json.RawMessage {
 		return json.RawMessage(`{"omitted":true}`)
 	}
 	return data
+}
+
+func decodeJSON(raw []byte, target any) bool {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+	if decoder.Decode(target) != nil {
+		return false
+	}
+	var extra any
+	return decoder.Decode(&extra) == io.EOF
+}
+
+// ResponseHasError recognizes OpenAI-compatible error envelopes even when an
+// upstream incorrectly returns HTTP 200. Nested tool-result fields are not errors.
+func ResponseHasError(raw []byte) bool {
+	var envelope struct {
+		Error json.RawMessage `json:"error"`
+	}
+	return json.Unmarshal(raw, &envelope) == nil && len(envelope.Error) > 0 && !bytes.Equal(bytes.TrimSpace(envelope.Error), []byte("null"))
 }
 
 func sanitize(v any, depth int) any {
@@ -60,11 +80,18 @@ func sanitize(v any, depth int) any {
 // StreamSnapshot parses complete SSE events, including events split across writes.
 // It retains structured tool deltas alongside a convenient assistant text field.
 func StreamSnapshot(raw []byte, truncated bool) (json.RawMessage, bool) {
+	var state StreamState
+	_, _ = state.Write(raw)
+	return StreamSnapshotWithCompletion(raw, truncated, state.Complete()), state.Complete()
+}
+
+// StreamSnapshotWithCompletion uses the full-stream observer's status even when
+// only a prefix of the response was retained for the administrator.
+func StreamSnapshotWithCompletion(raw []byte, truncated, complete bool) json.RawMessage {
 	events := make([]any, 0)
 	var text strings.Builder
-	complete := false
-	failed := false
 	normalized := bytes.ReplaceAll(raw, []byte("\r\n"), []byte("\n"))
+	normalized = bytes.ReplaceAll(normalized, []byte("\r"), []byte("\n"))
 	frames := bytes.Split(normalized, []byte("\n\n"))
 	// The last element lacks a frame delimiter; a trailing partial event is not evidence of completion.
 	for _, frame := range frames[:len(frames)-1] {
@@ -76,23 +103,13 @@ func StreamSnapshot(raw []byte, truncated bool) (json.RawMessage, bool) {
 		}
 		payload := strings.Join(data, "\n")
 		if payload == "[DONE]" {
-			complete = true
 			continue
 		}
 		var event map[string]any
-		if json.Unmarshal([]byte(payload), &event) != nil {
+		if !decodeJSON([]byte(payload), &event) {
 			continue
 		}
 		typ, _ := event["type"].(string)
-		switch typ {
-		case "response.completed", "message_stop":
-			complete = true
-		case "response.failed", "response.incomplete", "error":
-			failed = true
-		}
-		if event["error"] != nil {
-			failed = true
-		}
 		if typ == "response.output_text.delta" {
 			if delta, ok := event["delta"].(string); ok {
 				text.WriteString(delta)
@@ -116,6 +133,6 @@ func StreamSnapshot(raw []byte, truncated bool) (json.RawMessage, bool) {
 		}
 		events = append(events, sanitize(event, 0))
 	}
-	encoded, _ := json.Marshal(map[string]any{"text": strings.ReplaceAll(text.String(), "\x00", "\uFFFD"), "events": events, "complete": complete && !failed, "truncated": truncated})
-	return encoded, complete && !failed
+	encoded, _ := json.Marshal(map[string]any{"text": strings.ReplaceAll(text.String(), "\x00", "\uFFFD"), "events": events, "complete": complete, "truncated": truncated})
+	return encoded
 }

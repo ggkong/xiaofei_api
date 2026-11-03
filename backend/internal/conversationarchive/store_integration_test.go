@@ -47,8 +47,9 @@ func TestStorePostgresLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	store := New(db, Options{Enabled: true, RetentionDays: 30})
+	baseTime := time.Now().UTC().Truncate(time.Second)
 	u, k := int64(1), int64(11)
-	r := Record{RequestID: "test-1", UserID: &u, APIKeyID: &k, SessionID: "shared-session", Endpoint: "/v1/chat/completions", Model: "test-model", HTTPStatus: 200, Status: "complete", RequestBody: json.RawMessage(`{"messages":[{"role":"user","content":"hello"}]}`), ResponseBody: json.RawMessage(`{"choices":[{"message":{"content":"world"}}]}`), CreatedAt: time.Now()}
+	r := Record{RequestID: "test-1", UserID: &u, APIKeyID: &k, SessionID: "shared-session", Endpoint: "/v1/chat/completions", Model: "test-model", HTTPStatus: 200, Status: "complete", RequestBody: json.RawMessage(`{"messages":[{"role":"user","content":"hello"}]}`), ResponseBody: json.RawMessage(`{"choices":[{"message":{"content":"world"}}]}`), CreatedAt: baseTime}
 	if err = store.Save(ctx, &r); err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +57,7 @@ func TestStorePostgresLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	r.RequestID = "test-2"
+	r.CreatedAt = baseTime.Add(time.Hour)
 	u, k = 2, 22
 	if err = store.Save(ctx, &r); err != nil {
 		t.Fatal(err)
@@ -65,6 +67,20 @@ func TestStorePostgresLifecycle(t *testing.T) {
 		t.Fatalf("identity-scoped list: items=%d err=%v", len(items), err)
 	}
 	id := items[0].ID
+	from := baseTime.In(time.FixedZone("UTC+8", 8*3600))
+	until := baseTime.Add(time.Hour).In(time.FixedZone("UTC+8", 8*3600))
+	ranged, err := store.List(ctx, Filter{CreatedFrom: &from, CreatedUntil: &until})
+	if err != nil || len(ranged) != 1 || ranged[0].ID != id {
+		t.Fatalf("timezone-aware inclusive/exclusive time range failed: %v", err)
+	}
+	page, err := store.List(ctx, Filter{Limit: 1})
+	if err != nil || len(page) != 1 {
+		t.Fatal("first cursor page failed")
+	}
+	next, err := store.List(ctx, Filter{Limit: 1, BeforeID: page[0].ID})
+	if err != nil || len(next) != 1 || next[0].ID != id {
+		t.Fatal("cursor pagination duplicated or lost a record")
+	}
 	if len(items[0].RequestBody) > 0 || len(items[0].ResponseBody) > 0 {
 		t.Fatal("list leaked message bodies")
 	}

@@ -29,8 +29,22 @@ export default {
     "deleteConfirm": "Permanently delete this conversation record?",
     "loadError": "Unable to read records. Check administrator permissions and service status.",
     "noSession": "Independent request",
-    "limitNotice": "Content exceeded the archive limit. Some content was omitted; request forwarding was unaffected."
+    "limitNotice": "Content exceeded the archive limit. Some content was omitted; request forwarding was unaffected.",
+    "from": "From",
+    "until": "Until (exclusive)",
+    "invalidRange": "Choose a valid range. The end must be after the start.",
+    "raw": "Show raw structure and tool calls",
+    "noText": "No displayable text. Inspect the raw structure for tool calls, omitted media, or limited content.",
+    "roles": {
+        "system": "System",
+        "developer": "Developer",
+        "user": "User",
+        "assistant": "Assistant",
+        "tool": "Tool result",
+        "message": "Message"
+    }
 },
+
   common: {
     loading: 'Loading...',
     submitting: 'Submitting...',

@@ -77,3 +77,22 @@ func TestPayloadsCannotContainPostgresNullCharacters(t *testing.T) {
 		t.Fatal("stream retained a JSONB-incompatible null character")
 	}
 }
+
+func TestSnapshotPreservesLargeToolResultNumbers(t *testing.T) {
+	raw := []byte(`{"messages":[{"role":"tool","content":{"record_id":9007199254740993}}]}`)
+	if !strings.Contains(string(Snapshot(raw, false)), "9007199254740993") {
+		t.Fatal("tool result number lost precision")
+	}
+	if string(Snapshot([]byte(`{} {}`), false)) != `{"omitted":true}` {
+		t.Fatal("multiple JSON documents were accepted")
+	}
+}
+
+func TestResponseErrorEnvelopeIsNotConfusedWithToolOutput(t *testing.T) {
+	if !ResponseHasError([]byte(`{"error":{"message":"failed"}}`)) {
+		t.Fatal("HTTP-200 error envelope was missed")
+	}
+	if ResponseHasError([]byte(`{"error":null,"choices":[]}`)) || ResponseHasError([]byte(`{"choices":[{"message":{"content":"error"}}]}`)) {
+		t.Fatal("valid output was classified as an error")
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -43,17 +44,36 @@ func (b archiveBody) Close() error { return b.original.Close() }
 
 type archiveWriter struct {
 	gin.ResponseWriter
-	captured   *archiveBuffer
-	writeError bool
+	mu          sync.Mutex
+	captured    *archiveBuffer
+	writeError  bool
+	streamState conversationarchive.StreamState
 }
 
 func (w *archiveWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	n, err := w.ResponseWriter.Write(p)
 	_, _ = w.captured.Write(p[:n])
+	if strings.Contains(strings.ToLower(w.Header().Get("Content-Type")), "text/event-stream") {
+		_, _ = w.streamState.Write(p[:n])
+	}
 	if err != nil {
 		w.writeError = true
 	}
 	return n, err
+}
+
+func (w *archiveWriter) Flush() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.ResponseWriter.Flush()
+}
+
+func (w *archiveWriter) snapshot() ([]byte, bool, bool, bool, bool) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return bytes.Clone(w.captured.Bytes()), w.captured.truncated, w.writeError, w.streamState.Complete(), w.streamState.Failed()
 }
 func (w *archiveWriter) WriteString(s string) (int, error) { return w.Write([]byte(s)) }
 
@@ -93,6 +113,7 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 		defer func() {
 			c.Writer = originalWriter
 			c.Request.Body = originalBody
+			responseBytes, responseTruncated, writeError, streamComplete, streamFailed := writer.snapshot()
 			req := conversationarchive.Snapshot(request.Bytes(), request.truncated)
 			var fields struct {
 				Model  string `json:"model"`
@@ -107,29 +128,30 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 				fields.Model = string([]rune(fields.Model)[:255])
 			}
 			stream := strings.Contains(strings.ToLower(writer.Header().Get("Content-Type")), "text/event-stream")
-			output := conversationarchive.Snapshot(response.Bytes(), response.truncated)
+			output := conversationarchive.Snapshot(responseBytes, responseTruncated)
 			status := "complete"
 			if stream {
-				var complete bool
-				output, complete = conversationarchive.StreamSnapshot(response.Bytes(), response.truncated)
-				if !complete {
+				output = conversationarchive.StreamSnapshotWithCompletion(responseBytes, responseTruncated, streamComplete)
+				if streamFailed {
+					status = "error"
+				} else if !streamComplete {
 					status = "interrupted"
 				}
 			}
-			if !returned || writer.writeError || c.Request.Context().Err() != nil {
+			if !returned || writeError || c.Request.Context().Err() != nil {
 				status = "interrupted"
 			}
 			httpStatus := writer.Status()
 			if !returned && httpStatus < 400 {
 				httpStatus = 500
 			}
-			if httpStatus >= 400 {
+			if httpStatus >= 400 || (stream && streamFailed) || (!stream && conversationarchive.ResponseHasError(responseBytes)) {
 				status = "error"
 			}
 			r := conversationarchive.Record{RequestID: uuid.NewString(), UserID: &userID, APIKeyID: &keyID,
 				SessionID: service.ExtractClientSessionID(c), Endpoint: c.Request.URL.Path, Model: fields.Model,
 				Stream: stream || fields.Stream, HTTPStatus: httpStatus, Status: status, RequestBody: req, ResponseBody: output,
-				Truncated: request.truncated || response.truncated, DurationMS: time.Since(started).Milliseconds(), CreatedAt: started}
+				Truncated: request.truncated || responseTruncated, DurationMS: time.Since(started).Milliseconds(), CreatedAt: started}
 			if err := store.Save(context.Background(), &r); err != nil {
 				// No payload, DSN, or driver error text in operational logs.
 				slog.Error("conversation archive save failed", "request_id", r.RequestID)
