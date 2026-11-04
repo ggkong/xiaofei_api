@@ -734,7 +734,7 @@ func (s *ContentModerationService) UpdateConfig(ctx context.Context, input Updat
 	if err := saveErr; err != nil {
 		return nil, fmt.Errorf("save content moderation config: %w", err)
 	}
-	s.replaceRuntimeConfig(cfg, raw)
+	s.replaceRuntimeConfig(ctx, cfg, raw)
 	// 代理选择可能已变化，丢弃已解析的代理 URL 缓存，下次调用即时生效。
 	s.moderationProxyCache.Store(nil)
 	return s.engineConfigView(cfg), nil
@@ -1645,7 +1645,7 @@ func (s *ContentModerationService) refreshRuntimeSnapshot(ctx context.Context) (
 	return snapshot, nil
 }
 
-func (s *ContentModerationService) replaceRuntimeConfig(cfg *ContentModerationConfig, raw []byte) {
+func (s *ContentModerationService) replaceRuntimeConfig(ctx context.Context, cfg *ContentModerationConfig, raw []byte) {
 	if s == nil || cfg == nil {
 		return
 	}
@@ -1658,6 +1658,9 @@ func (s *ContentModerationService) replaceRuntimeConfig(cfg *ContentModerationCo
 	config := cfg.effectiveEngine(cfg.Engine)
 	keywordMatcher := newContentModerationKeywordMatcher(cfg.BlockedKeywords)
 	configDigest := sha256.Sum256(raw)
+	// A rule save can immediately follow enabling the global feature. Preserve
+	// the new gate value rather than copying the previous disabled snapshot.
+	riskControlEnabled := s.isRiskControlEnabled(ctx)
 
 	s.runtimeRefreshMu.Lock()
 	defer s.runtimeRefreshMu.Unlock()
@@ -1667,7 +1670,7 @@ func (s *ContentModerationService) replaceRuntimeConfig(cfg *ContentModerationCo
 	}
 	s.runtimeSnapshot.Store(&contentModerationRuntimeSnapshot{
 		allowlistedUsers:   current.allowlistedUsers,
-		riskControlEnabled: current.riskControlEnabled,
+		riskControlEnabled: riskControlEnabled,
 		config:             config,
 		keywordMatcher:     keywordMatcher,
 		configDigest:       configDigest,

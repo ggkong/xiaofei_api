@@ -198,6 +198,24 @@ func TestContentModerationRuntimeSnapshotUpdateConfigIsImmediate(t *testing.T) {
 	require.Equal(t, 1, getMultiple)
 }
 
+func TestContentModerationRuleSaveRefreshesNewlyEnabledGlobalGate(t *testing.T) {
+	repo := &contentModerationRuntimeSettingRepo{values: map[string]string{
+		SettingKeyRiskControlEnabled:      "false",
+		SettingKeyContentModerationConfig: runtimeCacheTestConfig(t, "blocked"),
+	}}
+	svc := runtimeCacheTestService(repo, time.Hour)
+	decision, err := svc.Check(context.Background(), runtimeCacheTestInput("blocked"))
+	require.NoError(t, err)
+	require.True(t, decision.Allowed)
+	require.NoError(t, repo.Set(context.Background(), SettingKeyRiskControlEnabled, "true"))
+	keywords := []string{"blocked"}
+	_, err = svc.UpdateConfig(context.Background(), UpdateContentModerationConfigInput{BlockedKeywords: &keywords})
+	require.NoError(t, err)
+	decision, err = svc.Check(context.Background(), runtimeCacheTestInput("blocked"))
+	require.NoError(t, err)
+	require.True(t, decision.Blocked, "the first request after saving must use the newly enabled feature gate")
+}
+
 func TestContentModerationRuntimeSnapshotUpdateWinsOverInitialLoad(t *testing.T) {
 	repo := &contentModerationRuntimeSettingRepo{values: map[string]string{
 		SettingKeyRiskControlEnabled:      "true",

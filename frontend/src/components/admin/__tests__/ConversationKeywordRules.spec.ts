@@ -22,6 +22,7 @@ describe('conversation keyword rules', () => {
       blocked_keywords: ['禁止词', 'SECRET'], all_groups: true, model_filter: { type: 'all', models: [] }, auto_ban_enabled: false
     }))
     expect(put).toHaveBeenNthCalledWith(2, '/admin/settings', { risk_control_enabled: true })
+    expect(put).toHaveBeenNthCalledWith(3, '/admin/risk-control/config', { enabled: true })
     expect(wrapper.get('[role="status"]').text()).toBe('conversationArchive.rulesSaved')
   })
 

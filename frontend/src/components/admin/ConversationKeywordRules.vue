@@ -66,7 +66,11 @@ async function save() {
       block_status: 403,
       block_message: t('conversationArchive.blockMessage')
     })
-    if (keywords.length) await apiClient.put('/admin/settings', { risk_control_enabled: true })
+    if (keywords.length) {
+      await apiClient.put('/admin/settings', { risk_control_enabled: true })
+      // Publish the rules with the freshly enabled global gate, before reporting success.
+      await apiClient.put('/admin/risk-control/config', { enabled: true })
+    }
     saved.value = true
   } catch { error.value = t('conversationArchive.rulesError') }
   finally { saving.value = false }

@@ -30,9 +30,9 @@
         <form class="space-y-3 border-b border-gray-100 p-4 dark:border-gray-800" @submit.prevent="search">
           <div class="flex flex-wrap items-end gap-3">
             <label class="min-w-48 flex-1 text-xs font-medium text-gray-500">{{ t('conversationArchive.searchLabel') }}<input v-model.trim="filters.q" class="input mt-1.5 w-full" maxlength="200" :placeholder="t('conversationArchive.searchPlaceholder')" /></label>
-            <label class="text-xs font-medium text-gray-500">{{ t('conversationArchive.model') }}<input v-model.trim="filters.model" class="input mt-1.5 w-40" maxlength="255" :placeholder="t('conversationArchive.allModels')" /></label>
+            <label class="text-xs font-medium text-gray-500">{{ t('conversationArchive.model') }}<input v-model.trim="filters.model" class="input mt-1.5 block w-40" maxlength="255" :placeholder="t('conversationArchive.allModels')" /></label>
             <label class="text-xs font-medium text-gray-500">{{ t('conversationArchive.status') }}
-              <select v-model="filters.status" class="input mt-1.5 w-32">
+              <select v-model="filters.status" class="input mt-1.5 block w-32">
                 <option value="">{{ t('conversationArchive.all') }}</option><option value="blocked">{{ t('conversationArchive.blocked') }}</option>
                 <option value="complete">{{ t('conversationArchive.complete') }}</option><option value="interrupted">{{ t('conversationArchive.interrupted') }}</option><option value="error">{{ t('conversationArchive.failed') }}</option>
               </select>
@@ -51,14 +51,23 @@
           </details>
         </form>
         <p v-if="error" class="mx-4 mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-950" role="alert">{{ error }}</p>
+        <div class="divide-y divide-gray-100 dark:divide-gray-800 md:hidden">
+          <button v-for="item in items" :key="item.id" class="block w-full space-y-3 p-4 text-left transition-colors hover:bg-primary-50/30" :disabled="detailLoading || deleting" @click="openDetail(item.id)">
+            <div class="flex min-w-0 items-center justify-between gap-3"><span class="flex min-w-0 items-center gap-2"><span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-50 text-xs font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-300">{{ initials(item) }}</span><span class="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">{{ memberName(item) }}</span></span><span class="max-w-36 truncate rounded-md bg-gray-100 px-2 py-1 font-mono text-[11px] text-gray-600 dark:bg-gray-800 dark:text-gray-300">{{ item.model || t('conversationArchive.unknownModel') }}</span></div>
+            <p class="line-clamp-3 whitespace-pre-wrap break-words text-sm font-medium leading-6 text-gray-900 dark:text-gray-100">{{ item.prompt_preview || (item.prompt_omitted ? t('conversationArchive.promptOmitted') : t('conversationArchive.toolTurn')) }}</p>
+            <p v-if="item.response_preview" class="line-clamp-2 text-xs leading-5 text-gray-500">{{ item.response_preview }}</p>
+            <div class="flex items-center justify-between text-[11px] text-gray-400"><span>{{ new Date(item.created_at).toLocaleString() }}</span><span :class="item.blocked ? 'text-red-600' : 'text-primary-600'">{{ item.blocked ? t('conversationArchive.blocked') : t('conversationArchive.view') }}</span></div>
+          </button>
+          <p v-if="!items.length" class="p-8 text-center text-sm text-gray-400">{{ loading ? t('conversationArchive.loading') : t('conversationArchive.empty') }}</p>
+        </div>
         <div class="overflow-x-auto">
-          <table class="w-full min-w-[760px] table-fixed text-left text-sm">
+          <table class="hidden w-full min-w-[760px] table-fixed text-left text-sm md:table">
             <thead class="bg-gray-50/80 text-xs font-medium text-gray-500 dark:bg-gray-800/50"><tr>
               <th class="w-44 px-5 py-3">{{ t('conversationArchive.member') }}</th>
               <th class="w-40 px-3 py-3">{{ t('conversationArchive.model') }}</th>
               <th class="px-3 py-3">{{ t('conversationArchive.question') }}</th>
               <th class="w-28 px-3 py-3">{{ t('conversationArchive.status') }}</th>
-              <th class="w-20 px-3 py-3"><span class="sr-only">{{ t('conversationArchive.actions') }}</span></th>
+              <th class="w-20 px-3 py-3">{{ t('conversationArchive.actions') }}</th>
             </tr></thead>
             <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
               <tr v-for="item in items" :key="item.id" class="group align-top transition-colors hover:bg-primary-50/30 dark:hover:bg-gray-800/40">
