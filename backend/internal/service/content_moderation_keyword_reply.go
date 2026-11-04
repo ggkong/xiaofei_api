@@ -69,7 +69,7 @@ func extractLiteralKeywordText(protocol string, body []byte) string {
 	if !gjson.ValidBytes(body) {
 		return ""
 	}
-	collector := moderationTextCollector{filterReminders: false}
+	collector := moderationTextCollector{filterReminders: false, preserveWhitespace: true}
 	var parts, images []string
 	switch protocol {
 	case ContentModerationProtocolAnthropicMessages:

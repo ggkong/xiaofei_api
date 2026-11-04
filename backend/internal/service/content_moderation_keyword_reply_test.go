@@ -71,6 +71,21 @@ func TestKeywordAutoReplyLiteralModeIsCaseSensitiveAndNotRegex(t *testing.T) {
 	}
 }
 
+func TestKeywordAutoReplyPreservesWhitespaceBetweenTextBlocks(t *testing.T) {
+	svc := preciseReplyService(t, "exact", "A\nB")
+	for _, tc := range []struct {
+		body string
+		hit  bool
+	}{
+		{`{"messages":[{"role":"user","content":[{"type":"text","text":"A"},{"type":"text","text":"B"}]}]}`, true},
+		{`{"messages":[{"role":"user","content":[{"type":"text","text":"A "},{"type":"text","text":" B"}]}]}`, false},
+	} {
+		decision, err := svc.Check(context.Background(), ContentModerationCheckInput{Protocol: ContentModerationProtocolOpenAIChat, Model: "test", Body: []byte(tc.body)})
+		require.NoError(t, err)
+		require.Equal(t, tc.hit, decision.Action == ContentModerationActionKeywordReply)
+	}
+}
+
 func TestKeywordRulesCanBePausedWithoutRemovingConfiguration(t *testing.T) {
 	svc := preciseReplyService(t, "exact", "Hello")
 	decision, err := svc.Check(context.Background(), replyInput(t, "Hello"))
