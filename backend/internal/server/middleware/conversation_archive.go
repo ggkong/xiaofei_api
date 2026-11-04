@@ -102,13 +102,16 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 		}
 		userID, keyID := key.UserID, key.ID
 		started := time.Now()
-		request := &archiveBuffer{limit: store.MaxBytes()}
-		response := &archiveBuffer{limit: store.MaxBytes()}
+		limit := store.MaxBytes()
+		request := &archiveBuffer{limit: limit}
+		response := &archiveBuffer{limit: limit}
 		originalRequest := c.Request
 		var requestSnapshot json.RawMessage
+		var promptHash string
 		c.Request = c.Request.WithContext(conversationarchive.WithRequestCapture(c.Request.Context(), func(body []byte) {
 			if requestSnapshot == nil {
-				requestSnapshot = conversationarchive.RequestSnapshot(body, store.MaxBytes())
+				promptHash = conversationarchive.PromptDigest(body)
+				requestSnapshot = conversationarchive.RequestSnapshot(body, limit)
 			}
 		}))
 		originalBody := c.Request.Body
@@ -152,6 +155,9 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 			if !returned || writeError || c.Request.Context().Err() != nil {
 				status = "interrupted"
 			}
+			if writer.Header().Get("X-Sub2API-Keyword-Reply") == "true" {
+				output = conversationarchive.MarkKeywordReply(output)
+			}
 			httpStatus := writer.Status()
 			if !returned && httpStatus < 400 {
 				httpStatus = 500
@@ -159,10 +165,23 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 			if httpStatus >= 400 || (stream && streamFailed) || (!stream && conversationarchive.ResponseHasError(responseBytes)) {
 				status = "error"
 			}
+			upstream, reported, conflict := service.ArchiveModelObservation(c)
+			source := "upstream"
+			if status == "error" && upstream == "" {
+				source = "error"
+			}
+			if conversationarchive.BlockedResponse(output) {
+				source = "blocked"
+			}
+			output = conversationarchive.AnnotateResponse(output, conversationarchive.ModelMetadata{UpstreamModel: upstream, ResponseModel: reported, Conflict: conflict, Source: source}, writer.Header().Get("X-Sub2API-Keyword-Reply") == "true")
 			r := conversationarchive.Record{RequestID: uuid.NewString(), UserID: &userID, APIKeyID: &keyID,
 				SessionID: service.ExtractClientSessionID(c), Endpoint: c.Request.URL.Path, Model: fields.Model,
 				Stream: stream || fields.Stream, HTTPStatus: httpStatus, Status: status, RequestBody: req, ResponseBody: output,
 				Truncated: request.truncated || responseTruncated, DurationMS: time.Since(started).Milliseconds(), CreatedAt: started}
+			r.PromptHash = promptHash
+			if key.User != nil {
+				r.UserName, r.UserEmail = key.User.Username, key.User.Email
+			}
 			if err := store.Save(context.Background(), &r); err != nil {
 				// No payload, DSN, or driver error text in operational logs.
 				slog.Error("conversation archive save failed", "request_id", r.RequestID)

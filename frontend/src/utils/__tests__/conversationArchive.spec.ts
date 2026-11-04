@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { archiveDateRange, archiveRequestMessages, archiveResponseMessages } from '../conversationArchive'
+import { archiveDateRange, archiveRequestMessages, archiveResponseMessages, archiveContextMessages, archiveResponseContext } from '../conversationArchive'
 
 describe('conversation archive display', () => {
   it('preserves request context order and supports Chat, Responses and Anthropic text', () => {
@@ -35,5 +35,35 @@ describe('conversation archive display', () => {
     expect(archiveDateRange('invalid', '')).toBeNull()
     expect(archiveDateRange('2026-11-04T01:00:00Z', '2026-11-04T00:00:00Z')).toBeNull()
     expect(archiveDateRange('2026-11-04T00:00:00Z', '2026-11-04T00:00:00Z')).toBeNull()
+  })
+
+  it('retains system, tool and media context in order', () => {
+    const context = archiveContextMessages({ instructions: 'policy', input: [
+      { role: 'user', content: [{ type: 'input_text', text: 'question' }, { type: 'input_image', image_url: '[media omitted]' }] },
+      { type: 'function_call', name: 'read_file', arguments: '{"path":"app.ts"}', call_id: 'call1' },
+      { type: 'function_call_output', call_id: 'call1', output: 'file contents' }
+    ] })
+    expect(context.map(item => item.role)).toEqual(['system', 'user', 'user', 'tool'])
+    expect(context[1].mediaCount).toBe(1)
+    expect(context[2].kind).toBe('tool')
+    expect(context[3].text).toContain('file contents')
+  })
+
+  it('uses terminal output without duplicating streaming deltas', () => {
+    const result = archiveResponseContext({ text: 'delta text', events: [
+      { type: 'response.output_text.delta', delta: 'delta text' },
+      { type: 'response.completed', response: { output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'complete text' }] }, { type: 'function_call', name: 'search', arguments: '{"q":"test"}' }] } }
+    ] })
+    expect(result).toHaveLength(2)
+    expect(result[0].text).toBe('complete text')
+    expect(result[1].kind).toBe('tool')
+  })
+
+  it('reassembles streamed Chat tool arguments', () => {
+    const result = archiveResponseContext({ events: [
+      { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { name: 'lookup', arguments: '{"q":' } }] } }] },
+      { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, function: { arguments: '"hello"}' } }] } }] }
+    ] })
+    expect(result).toEqual([{ role: 'assistant', kind: 'tool', name: 'lookup', text: '{"q":"hello"}' }])
   })
 })

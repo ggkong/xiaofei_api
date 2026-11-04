@@ -63,6 +63,13 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 	if _, err = db.Exec(string(migration)); err != nil {
 		t.Fatal(err)
 	}
+	blocksMigration, err := os.ReadFile("../../../migrations/250_conversation_archive_blocks.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(string(blocksMigration)); err != nil {
+		t.Fatal(err)
+	}
 	store := conversationarchive.New(db, conversationarchive.Options{Enabled: true, MaxBytes: 4096, RetentionDays: 30})
 	chunk := "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"}}]}\n\n"
 	reply := strings.Repeat(chunk, 100) + "data: [DONE]\n\n"

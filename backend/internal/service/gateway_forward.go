@@ -115,6 +115,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	// partial-stream results all use the same billing and usage-log path.
 	defer func() {
 		if result != nil {
+			model := strings.TrimSpace(result.UpstreamModel)
+			if model == "" {
+				model = result.Model
+			}
+			SetOpsUpstreamModel(c, model)
 			if tier := anthropicSpeedServiceTier(account, parsed.Speed, anthropicSpeedModel(parsed, result)); tier != nil {
 				result.ServiceTier = tier
 			}

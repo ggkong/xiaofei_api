@@ -56,6 +56,9 @@ type contentModerationConfigRequest struct {
 	PreHashCheckEnabled            *bool                                 `json:"pre_hash_check_enabled"`
 	BlockedKeywords                *[]string                             `json:"blocked_keywords"`
 	KeywordBlockingMode            *string                               `json:"keyword_blocking_mode"`
+	KeywordMatchMode               *string                               `json:"keyword_match_mode"`
+	KeywordAutoReplyEnabled        *bool                                 `json:"keyword_auto_reply_enabled"`
+	KeywordReply                   *string                               `json:"keyword_reply"`
 	ModelFilter                    *service.ContentModerationModelFilter `json:"model_filter"`
 }
 
@@ -123,7 +126,8 @@ func (h *ContentModerationHandler) UpdateConfig(c *gin.Context) {
 		PreHashCheckEnabled:            req.PreHashCheckEnabled,
 		BlockedKeywords:                req.BlockedKeywords,
 		KeywordBlockingMode:            req.KeywordBlockingMode,
-		ModelFilter:                    req.ModelFilter,
+		KeywordMatchMode:               req.KeywordMatchMode, KeywordAutoReplyEnabled: req.KeywordAutoReplyEnabled, KeywordReply: req.KeywordReply,
+		ModelFilter: req.ModelFilter,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)

@@ -51,10 +51,10 @@ describe('administrator conversation archive', () => {
     await wrapper.findAll('input[maxlength="255"]')[0].setValue('draft-model')
     await wrapper.findAll('button').find(button => button.text() === 'conversationArchive.next')!.trigger('click')
     await flushPromises()
-    expect(get).toHaveBeenLastCalledWith('/admin/conversation-archives', { params: { limit: 30, before_id: 100 } })
+    expect(get).toHaveBeenLastCalledWith('/admin/conversation-archives/groups', { params: { limit: 30, before_id: 100 } })
     await wrapper.get('form').trigger('submit')
     await flushPromises()
-    expect(get).toHaveBeenLastCalledWith('/admin/conversation-archives', { params: { limit: 30, model: 'draft-model' } })
+    expect(get).toHaveBeenLastCalledWith('/admin/conversation-archives/groups', { params: { limit: 30, model: 'draft-model' } })
   })
 
   it('rejects reversed date ranges without issuing a query', async () => {
@@ -88,5 +88,33 @@ describe('administrator conversation archive', () => {
     expect(wrapper.text()).not.toContain('stale-private-content')
     expect(wrapper.find('section[aria-live]').exists()).toBe(false)
     expect(wrapper.findAll('button').find(button => button.text() === 'conversationArchive.view')!.attributes('disabled')).toBeUndefined()
+  })
+
+  it('opens individual replies, model provenance and context within a group', async () => {
+    get.mockReset()
+    const base = { user_id: 42, api_key_id: 7, user_name: '张三', model: 'alias', created_at: '2026-11-04T00:00:00Z', status: 'complete', truncated: false, http_status: 200 }
+    const latest = { ...base, id: 2, upstream_model: 'model-two', response_model: 'provider-two', prompt_preview: '重复提问', response_preview: '第二次回复', conversation_key: 'a'.repeat(64), call_count: 2, group_source: 'question', models: ['model-one', 'model-two'] }
+    const older = { ...base, id: 1, upstream_model: 'model-one', response_model: 'provider-one', response_preview: '第一次回复' }
+    get.mockImplementation(async (url: string) => {
+      if (url.endsWith('/groups')) return { data: { items: [latest], next_before_id: 0, capture_enabled: true, retention_days: 0 } }
+      if (url === '/admin/conversation-archives') return { data: { items: [latest, older], next_before_id: 0 } }
+      const record = url.endsWith('/1') ? older : latest
+      return { data: { ...record, request_body: { messages: [{ role: 'system', content: '系统上下文' }, { role: 'assistant', content: '历史回复' }, { role: 'user', content: '重复提问' }] }, response_body: { choices: [{ message: { role: 'assistant', content: record.response_preview } }] } } }
+    })
+    const wrapper = mount(ConversationArchiveView)
+    await flushPromises()
+    expect(wrapper.get('tbody').text()).toContain('conversationArchive.groupCalls')
+    await wrapper.findAll('button').find(button => button.text() === 'conversationArchive.view')!.trigger('click')
+    await flushPromises()
+    expect(get).toHaveBeenCalledWith('/admin/conversation-archives', { params: { conversation_key: latest.conversation_key, limit: 30 } })
+    await wrapper.findAll('button').find(button => button.text().includes('model-one') && button.text().includes('第一次回复'))!.trigger('click')
+    await flushPromises()
+    expect(get).toHaveBeenLastCalledWith('/admin/conversation-archives/1')
+    await wrapper.findAll('[role="tab"]').find(tab => tab.text() === 'conversationArchive.models')!.trigger('click')
+    expect(wrapper.get('[role="tabpanel"]').text()).toContain('provider-one')
+    expect(wrapper.get('[role="tabpanel"]').text()).not.toContain('provider-two')
+    await wrapper.findAll('[role="tab"]').find(tab => tab.text() === 'conversationArchive.context')!.trigger('click')
+    expect(wrapper.get('[role="tabpanel"]').text()).toContain('历史回复')
+    expect(wrapper.get('[role="tabpanel"]').text()).toContain('系统上下文')
   })
 })

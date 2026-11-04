@@ -9,6 +9,7 @@ import (
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/tidwall/gjson"
 	"go.uber.org/zap"
 )
 
@@ -85,6 +86,11 @@ func runSecurityAudit(c *gin.Context, reqLog *zap.Logger, coordinator *securitya
 			Allowed: legacyDecision.Allowed, Blocked: legacyDecision.Blocked, Flagged: legacyDecision.Flagged,
 			Message: legacyDecision.Message, StatusCode: legacyDecision.StatusCode,
 			ErrorCode: "content_policy_violation", Action: legacyDecision.Action,
+		}
+		if legacyDecision.Action == service.ContentModerationActionKeywordReply {
+			decision.Kind, decision.HTTPStatus, decision.AllowNextStage = securityaudit.DecisionKind("reply"), http.StatusOK, false
+			decision.Legacy.Reply = &securityaudit.LocalKeywordReply{Text: legacyDecision.Message, Model: model, Protocol: protocol, Stream: gjson.GetBytes(body, "stream").Bool() || isSecurityAuditWebSocketStage(stage) || strings.Contains(c.Request.URL.Path, "streamGenerateContent")}
+			return &decision
 		}
 		if legacyDecision.Blocked {
 			decision.Kind, decision.HTTPStatus, decision.ErrorCode, decision.ClientMessage, decision.AllowNextStage = securityaudit.DecisionBlock, contentModerationStatus(legacyDecision), "content_policy_violation", legacyDecision.Message, false

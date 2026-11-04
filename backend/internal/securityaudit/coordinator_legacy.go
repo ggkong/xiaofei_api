@@ -2,8 +2,10 @@ package securityaudit
 
 import (
 	"context"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/tidwall/gjson"
 )
 
 type LegacyModerationAdapter struct {
@@ -27,9 +29,13 @@ func (a *LegacyModerationAdapter) Check(ctx context.Context, req Request) (*Lega
 	if err != nil || decision == nil {
 		return nil, err
 	}
-	return &LegacyDecision{
+	result := &LegacyDecision{
 		Allowed: decision.Allowed, Blocked: decision.Blocked, Flagged: decision.Flagged,
 		Message: decision.Message, StatusCode: decision.StatusCode,
 		ErrorCode: "content_policy_violation", Action: decision.Action,
-	}, nil
+	}
+	if decision.Action == service.ContentModerationActionKeywordReply {
+		result.Reply = &LocalKeywordReply{Text: decision.Message, Model: req.Model, Protocol: req.Protocol, Stream: gjson.GetBytes(req.Body, "stream").Bool() || req.Stage == "first_turn" || req.Stage == "subsequent_turn" || strings.Contains(req.Endpoint, "streamGenerateContent")}
+	}
+	return result, nil
 }

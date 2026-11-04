@@ -11,6 +11,72 @@ import (
 
 type requestCaptureKey struct{}
 
+type ModelMetadata struct {
+	UpstreamModel string `json:"upstream_model"`
+	ResponseModel string `json:"response_model"`
+	WireModel     string `json:"wire_model"`
+	Conflict      bool   `json:"conflict"`
+	Source        string `json:"source"`
+}
+
+func AnnotateResponse(raw json.RawMessage, meta ModelMetadata, local bool) json.RawMessage {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil || fields == nil {
+		return raw
+	}
+	meta.UpstreamModel = boundedText(meta.UpstreamModel, 255)
+	meta.ResponseModel = boundedText(meta.ResponseModel, 255)
+	meta.WireModel = ReportedWireModel(raw)
+	if local {
+		meta.UpstreamModel, meta.ResponseModel = "", ""
+		meta.Source = "keyword"
+	}
+	data, err := json.Marshal(meta)
+	if err != nil {
+		return raw
+	}
+	fields["_sub2api_archive"] = data
+	if local {
+		fields["keyword_auto_reply"] = json.RawMessage("true")
+	} else {
+		fields["keyword_auto_reply"] = json.RawMessage("false")
+	}
+	result, err := json.Marshal(fields)
+	if err != nil {
+		return raw
+	}
+	return result
+}
+
+func ReportedWireModel(raw []byte) string {
+	root := gjson.ParseBytes(raw)
+	model := ""
+	read := func(value gjson.Result) {
+		for _, path := range []string{"model", "response.model", "message.model", "modelVersion"} {
+			if m := value.Get(path); m.Type == gjson.String && m.String() != "" {
+				model = boundedText(m.String(), 255)
+				break
+			}
+		}
+	}
+	read(root)
+	root.Get("events").ForEach(func(_, event gjson.Result) bool { read(event); return true })
+	return model
+}
+
+func MarkKeywordReply(raw json.RawMessage) json.RawMessage {
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(raw, &fields) != nil || fields == nil {
+		return raw
+	}
+	fields["keyword_auto_reply"] = json.RawMessage("true")
+	data, err := json.Marshal(fields)
+	if err != nil {
+		return raw
+	}
+	return data
+}
+
 // WithRequestCapture observes the body the gateway already reads. It avoids
 // buffering a second, potentially large copy in the archive middleware.
 func WithRequestCapture(ctx context.Context, capture func([]byte)) context.Context {

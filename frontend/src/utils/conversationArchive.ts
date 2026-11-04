@@ -1,6 +1,105 @@
 export interface ArchiveMessage {
   role: string
   text: string
+  kind?: 'text' | 'tool'
+  name?: string
+  mediaCount?: number
+}
+
+function contextMessage(value: unknown, fallbackRole: string): ArchiveMessage[] {
+  const item = object(value)
+  if (!item) return []
+  const role = typeof item.role === 'string' ? item.role : fallbackRole
+  const result: ArchiveMessage[] = []
+  const content = item.content
+  const parts = Array.isArray(content) ? content : [content]
+  const text = textContent(content)
+  const mediaCount = parts.filter(part => {
+    const value = object(part)
+    return value && ['image', 'image_url', 'input_image', 'input_audio', 'audio', 'file', 'input_file'].includes(String(value.type))
+  }).length
+  if (text || mediaCount) result.push({ role, text, mediaCount })
+  const tools = [...parts.filter(part => ['tool_use', 'tool_result'].includes(String(object(part)?.type))), ...(Array.isArray(item.tool_calls) ? item.tool_calls : [])]
+  if (item.type === 'function_call' || item.type === 'function_call_output') tools.push(item)
+  if (item.function_call) tools.push(item.function_call)
+  if (role === 'tool' && !result.length && item.output !== undefined) tools.push(item)
+  for (const tool of tools) {
+    const data = object(tool)
+    const fn = object(data?.function)
+    result.push({ role: data?.type === 'tool_result' || data?.type === 'function_call_output' ? 'tool' : role, kind: 'tool', name: String(fn?.name ?? data?.name ?? data?.tool_use_id ?? data?.call_id ?? ''), text: JSON.stringify(tool, null, 2) })
+  }
+  return result
+}
+
+export function archiveContextMessages(value: unknown): ArchiveMessage[] {
+  const body = object(value)
+  if (!body) return []
+  const result: ArchiveMessage[] = []
+  for (const value of [body.system, body.instructions]) {
+    const text = textContent(value)
+    if (text) result.push({ role: 'system', text })
+  }
+  const input = body.messages ?? body.input
+  if (typeof input === 'string') result.push({ role: 'user', text: input })
+  if (Array.isArray(input)) for (const item of input) result.push(...contextMessage(item, 'user'))
+  return result
+}
+
+export function archiveResponseContext(value: unknown): ArchiveMessage[] {
+  const body = object(value)
+  if (!body) return []
+  if (Array.isArray(body.events)) {
+    // A terminal structured item contains complete tool arguments; selecting it
+    // avoids duplicating the same response's deltas and completed output.
+    for (const raw of [...body.events].reverse()) {
+      const event = object(raw)
+      if (['response.completed', 'response.done'].includes(String(event?.type)) && object(event?.response)) {
+        const terminal = archiveResponseContext(event!.response)
+        if (terminal.length) return terminal
+      }
+    }
+    const text = archiveResponseMessages(body)
+    const tools: ArchiveMessage[] = []
+    const chatTools = new Map<string, { name: string; arguments: string }>()
+    for (const raw of body.events) {
+      const event = object(raw)
+      if (event?.type === 'response.output_item.done') tools.push(...contextMessage(event.item, 'assistant').filter(item => item.kind === 'tool'))
+      if (event?.type === 'content_block_start') {
+        const block = object(event.content_block)
+        if (block?.type === 'tool_use') tools.push({ role: 'assistant', kind: 'tool', name: String(block.name ?? ''), text: JSON.stringify(block, null, 2) })
+      }
+      if (event?.type === 'content_block_delta' && typeof object(event.delta)?.partial_json === 'string' && tools.length) tools[tools.length - 1].text += String(object(event.delta)!.partial_json)
+      if (!Array.isArray(event?.choices)) continue
+      for (const rawChoice of event.choices) {
+        const choice = object(rawChoice)
+        const delta = object(choice?.delta)
+        if (!Array.isArray(delta?.tool_calls)) continue
+        for (const rawTool of delta.tool_calls) {
+          const tool = object(rawTool)
+          const fn = object(tool?.function)
+          const key = `${choice?.index ?? 0}/${tool?.index ?? 0}`
+          const existing = chatTools.get(key) ?? { name: '', arguments: '' }
+          if (typeof fn?.name === 'string') existing.name = fn.name
+          if (typeof fn?.arguments === 'string') existing.arguments += fn.arguments
+          chatTools.set(key, existing)
+        }
+      }
+    }
+    for (const tool of chatTools.values()) tools.push({ role: 'assistant', kind: 'tool', name: tool.name, text: tool.arguments })
+    return [...text, ...tools]
+  }
+  if (Array.isArray(body.choices)) return body.choices.flatMap(raw => contextMessage(object(raw)?.message, 'assistant'))
+  if (Array.isArray(body.output)) return body.output.flatMap(raw => contextMessage(raw, 'assistant'))
+  if (Array.isArray(body.content)) return contextMessage(body, 'assistant')
+  if (Array.isArray(body.candidates)) return body.candidates.flatMap(raw => {
+    const parts = object(object(raw)?.content)?.parts
+    return Array.isArray(parts) ? parts.flatMap(part => {
+      const value = object(part)
+      if (typeof value?.text === 'string') return [{ role: 'assistant', text: value.text } as ArchiveMessage]
+      return value?.functionCall ? [{ role: 'assistant', kind: 'tool', text: JSON.stringify(value.functionCall, null, 2) } as ArchiveMessage] : []
+    }) : []
+  })
+  return archiveResponseMessages(value)
 }
 
 function object(value: unknown): Record<string, unknown> | null {
