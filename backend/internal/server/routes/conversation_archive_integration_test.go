@@ -53,7 +53,7 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = db.Close(); _, _ = base.Exec("DROP SCHEMA " + schema + " CASCADE") }()
-	if _, err = db.Exec("CREATE TABLE users(id BIGINT PRIMARY KEY); CREATE TABLE api_keys(id BIGINT PRIMARY KEY); INSERT INTO users VALUES(42); INSERT INTO api_keys VALUES(7)"); err != nil {
+	if _, err = db.Exec("CREATE TABLE users(id BIGINT PRIMARY KEY,username TEXT NOT NULL DEFAULT '',email TEXT NOT NULL DEFAULT ''); CREATE TABLE api_keys(id BIGINT PRIMARY KEY); INSERT INTO users(id,username) VALUES(42,'Archive member'); INSERT INTO api_keys VALUES(7)"); err != nil {
 		t.Fatal(err)
 	}
 	migration, err := os.ReadFile("../../../migrations/249_conversation_archives.sql")

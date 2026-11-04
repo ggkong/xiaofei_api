@@ -47,6 +47,11 @@ func registerConversationArchiveRoutes(admin *gin.RouterGroup, store *conversati
 			}
 		}
 		f.Model = c.Query("model")
+		f.Query = strings.TrimSpace(c.Query("q"))
+		if len([]rune(f.Query)) > 200 || !utf8.ValidString(f.Query) || strings.ContainsRune(f.Query, 0) {
+			response.BadRequest(c, "Invalid search query")
+			return
+		}
 		for name, target := range map[string]**time.Time{"created_from": &f.CreatedFrom, "created_until": &f.CreatedUntil} {
 			if value := c.Query(name); value != "" {
 				timestamp, err := time.Parse(time.RFC3339Nano, value)
@@ -67,7 +72,7 @@ func registerConversationArchiveRoutes(admin *gin.RouterGroup, store *conversati
 			response.BadRequest(c, "Invalid model or session filter")
 			return
 		}
-		if f.Status != "" && f.Status != "complete" && f.Status != "error" && f.Status != "interrupted" {
+		if f.Status != "" && f.Status != "complete" && f.Status != "error" && f.Status != "interrupted" && f.Status != "blocked" {
 			response.BadRequest(c, "Invalid status")
 			return
 		}

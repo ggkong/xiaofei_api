@@ -104,6 +104,13 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 		started := time.Now()
 		request := &archiveBuffer{limit: store.MaxBytes()}
 		response := &archiveBuffer{limit: store.MaxBytes()}
+		originalRequest := c.Request
+		var requestSnapshot json.RawMessage
+		c.Request = c.Request.WithContext(conversationarchive.WithRequestCapture(c.Request.Context(), func(body []byte) {
+			if requestSnapshot == nil {
+				requestSnapshot = conversationarchive.RequestSnapshot(body, store.MaxBytes())
+			}
+		}))
 		originalBody := c.Request.Body
 		c.Request.Body = archiveBody{Reader: io.TeeReader(originalBody, request), original: originalBody}
 		originalWriter := c.Writer
@@ -111,10 +118,14 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 		c.Writer = writer
 		returned := false
 		defer func() {
+			defer func() { c.Request = originalRequest }()
 			c.Writer = originalWriter
 			c.Request.Body = originalBody
 			responseBytes, responseTruncated, writeError, streamComplete, streamFailed := writer.snapshot()
 			req := conversationarchive.Snapshot(request.Bytes(), request.truncated)
+			if requestSnapshot != nil {
+				req = requestSnapshot
+			}
 			var fields struct {
 				Model  string `json:"model"`
 				Stream bool   `json:"stream"`

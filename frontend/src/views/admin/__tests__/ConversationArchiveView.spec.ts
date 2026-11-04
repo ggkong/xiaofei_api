@@ -8,6 +8,15 @@ vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }))
 
 describe('administrator conversation archive', () => {
+  it('shows the member name, model, question and reply directly in the list', async () => {
+    get.mockReset()
+    get.mockResolvedValueOnce({ data: { items: [{ id: 1, user_id: 42, user_name: '张三', user_email: 'zhang@example.invalid', model: 'coding-model', prompt_preview: '怎么开发这个程序？', response_preview: '先完成需求分析。', created_at: '2026-11-03T00:00:00Z', status: 'complete' }], next_before_id: 0, capture_enabled: true } })
+    const wrapper = mount(ConversationArchiveView)
+    await flushPromises()
+    for (const text of ['张三', 'coding-model', '怎么开发这个程序？', '先完成需求分析。']) expect(wrapper.get('tbody').text()).toContain(text)
+    expect(wrapper.find('section[aria-live]').exists()).toBe(false)
+  })
+
   it('renders captured model output as inert text and shows disabled capture', async () => {
     get.mockReset()
     const record = { id: 1, user_id: 42, api_key_id: 7, session_id: '', model: 'test', created_at: '2026-11-03T00:00:00Z', status: 'complete', truncated: false }

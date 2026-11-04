@@ -7,10 +7,22 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/conversationarchive"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+func TestGatewayBodyReaderObservesOriginalQuestionWithoutChangingRequest(t *testing.T) {
+	raw := []byte(`{"model":"coding-model","input":"成员的问题"}`)
+	var captured []byte
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(raw))
+	req = req.WithContext(conversationarchive.WithRequestCapture(req.Context(), func(body []byte) { captured = append([]byte(nil), body...) }))
+	body, err := readLenientJSONRequestBodyWithPrealloc(req, nil)
+	require.NoError(t, err)
+	require.Equal(t, raw, body)
+	require.Equal(t, raw, captured)
+}
 
 func TestRequestBodyLimitTooLarge(t *testing.T) {
 	gin.SetMode(gin.TestMode)

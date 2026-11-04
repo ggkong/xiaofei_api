@@ -31,7 +31,7 @@ func TestStorePostgresLifecycle(t *testing.T) {
 		t.Fatal("refusing to run outside archive_test")
 	}
 	ctx := context.Background()
-	_, err = db.Exec(`CREATE TABLE users(id BIGINT PRIMARY KEY); CREATE TABLE api_keys(id BIGINT PRIMARY KEY); INSERT INTO users VALUES(1),(2); INSERT INTO api_keys VALUES(11),(22);`)
+	_, err = db.Exec(`CREATE TABLE users(id BIGINT PRIMARY KEY,username TEXT NOT NULL DEFAULT '',email TEXT NOT NULL DEFAULT ''); CREATE TABLE api_keys(id BIGINT PRIMARY KEY); INSERT INTO users(id,username,email) VALUES(1,'张三','zhang@example.invalid'),(2,'李四','li@example.invalid'); INSERT INTO api_keys VALUES(11),(22);`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,6 +83,13 @@ func TestStorePostgresLifecycle(t *testing.T) {
 	}
 	if len(items[0].RequestBody) > 0 || len(items[0].ResponseBody) > 0 {
 		t.Fatal("list leaked message bodies")
+	}
+	if items[0].UserName != "张三" || items[0].PromptPreview != "hello" || items[0].ResponsePreview != "world" {
+		t.Fatal("list is missing the member name or conversation previews")
+	}
+	searched, err := store.List(ctx, Filter{Query: "张三"})
+	if err != nil || len(searched) != 1 || searched[0].ID != id {
+		t.Fatal("member name search failed")
 	}
 	detail, err := store.Get(ctx, id)
 	if err != nil || !strings.Contains(string(detail.ResponseBody), "world") {
