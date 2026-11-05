@@ -624,6 +624,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/keyword-rules',
+    name: 'AdminKeywordRules',
+    component: () => import('@/views/admin/KeywordRulesView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true, title: 'Keyword rules', titleKey: 'keywordRules.title', descriptionKey: 'keywordRules.description' }
+  },
+  {
     path: '/admin/conversation-archives',
     name: 'AdminConversationArchive',
     component: () => import('@/views/admin/ConversationArchiveView.vue'),

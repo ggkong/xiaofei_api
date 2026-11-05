@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/keywordrules"
 	"github.com/lib/pq"
 	"github.com/tidwall/gjson"
 )
@@ -39,42 +40,43 @@ func OptionsFromEnv() Options {
 }
 
 type Record struct {
-	ID              int64           `json:"id"`
-	RequestID       string          `json:"request_id"`
-	UserID          *int64          `json:"user_id"`
-	APIKeyID        *int64          `json:"api_key_id"`
-	SessionID       string          `json:"session_id"`
-	Endpoint        string          `json:"endpoint"`
-	Model           string          `json:"model"`
-	Stream          bool            `json:"stream"`
-	HTTPStatus      int             `json:"http_status"`
-	Status          string          `json:"status"`
-	RequestBody     json.RawMessage `json:"request_body,omitempty"`
-	ResponseBody    json.RawMessage `json:"response_body,omitempty"`
-	Truncated       bool            `json:"truncated"`
-	DurationMS      int64           `json:"duration_ms"`
-	CreatedAt       time.Time       `json:"created_at"`
-	ExpiresAt       time.Time       `json:"expires_at"`
-	UserName        string          `json:"user_name"`
-	UserEmail       string          `json:"user_email"`
-	PromptPreview   string          `json:"prompt_preview"`
-	ResponsePreview string          `json:"response_preview"`
-	Blocked         bool            `json:"blocked"`
-	AutoReply       bool            `json:"auto_reply"`
-	PromptOmitted   bool            `json:"prompt_omitted"`
-	UpstreamModel   string          `json:"upstream_model"`
-	ResponseModel   string          `json:"response_model"`
-	WireModel       string          `json:"wire_model"`
-	ModelConflict   bool            `json:"model_conflict"`
-	ReplySource     string          `json:"reply_source"`
-	ConversationKey string          `json:"conversation_key"`
-	PromptHash      string          `json:"-"`
-	GroupSource     string          `json:"group_source"`
-	CallCount       int64           `json:"call_count,omitempty"`
-	Models          []string        `json:"models,omitempty"`
-	FirstAt         *time.Time      `json:"first_at,omitempty"`
-	BlockedCount    int64           `json:"blocked_count,omitempty"`
-	AutoReplyCount  int64           `json:"auto_reply_count,omitempty"`
+	ID              int64              `json:"id"`
+	RequestID       string             `json:"request_id"`
+	UserID          *int64             `json:"user_id"`
+	APIKeyID        *int64             `json:"api_key_id"`
+	SessionID       string             `json:"session_id"`
+	Endpoint        string             `json:"endpoint"`
+	Model           string             `json:"model"`
+	Stream          bool               `json:"stream"`
+	HTTPStatus      int                `json:"http_status"`
+	Status          string             `json:"status"`
+	RequestBody     json.RawMessage    `json:"request_body,omitempty"`
+	ResponseBody    json.RawMessage    `json:"response_body,omitempty"`
+	Truncated       bool               `json:"truncated"`
+	DurationMS      int64              `json:"duration_ms"`
+	CreatedAt       time.Time          `json:"created_at"`
+	ExpiresAt       time.Time          `json:"expires_at"`
+	UserName        string             `json:"user_name"`
+	UserEmail       string             `json:"user_email"`
+	PromptPreview   string             `json:"prompt_preview"`
+	ResponsePreview string             `json:"response_preview"`
+	Blocked         bool               `json:"blocked"`
+	AutoReply       bool               `json:"auto_reply"`
+	PromptOmitted   bool               `json:"prompt_omitted"`
+	UpstreamModel   string             `json:"upstream_model"`
+	ResponseModel   string             `json:"response_model"`
+	WireModel       string             `json:"wire_model"`
+	ModelConflict   bool               `json:"model_conflict"`
+	ReplySource     string             `json:"reply_source"`
+	ConversationKey string             `json:"conversation_key"`
+	PromptHash      string             `json:"-"`
+	GroupSource     string             `json:"group_source"`
+	CallCount       int64              `json:"call_count,omitempty"`
+	Models          []string           `json:"models,omitempty"`
+	FirstAt         *time.Time         `json:"first_at,omitempty"`
+	BlockedCount    int64              `json:"blocked_count,omitempty"`
+	AutoReplyCount  int64              `json:"auto_reply_count,omitempty"`
+	KeywordRules    []keywordrules.Hit `json:"keyword_rules,omitempty"`
 	storageVersion  int
 }
 
@@ -222,6 +224,9 @@ func scanRecord(row scanner, detail bool) (Record, error) {
 		}
 		r.ModelConflict = meta.Get("conflict").Bool()
 		r.ReplySource = meta.Get("source").String()
+		if data := meta.Get("keyword_rules"); data.IsArray() {
+			_ = json.Unmarshal([]byte(data.Raw), &r.KeywordRules)
+		}
 	}
 
 	if !detail {

@@ -984,68 +984,9 @@
             </div>
           </div>
 
-          <div v-else-if="activeSettingsTab === 'keywords'" class="space-y-5">
-            <div
-              class="flex items-start gap-3 rounded-lg border p-4"
-              :class="keywordNotice.toneClass"
-            >
-              <Icon
-                :name="keywordNotice.icon"
-                size="md"
-                :class="keywordNotice.iconClass"
-              />
-              <div class="text-sm leading-6">
-                <p class="font-medium" :class="keywordNotice.titleClass">{{ keywordNotice.title }}</p>
-                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ keywordNotice.description }}</p>
-              </div>
-            </div>
-
-            <div class="space-y-2">
-              <label class="input-label">{{ t('admin.riskControl.keywordBlockingMode') }}</label>
-              <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <button
-                  v-for="option in keywordBlockingModeOptions"
-                  :key="option.value"
-                  type="button"
-                  class="rounded-lg border p-3 text-left transition-colors"
-                  :class="configForm.keyword_blocking_mode === option.value
-                    ? 'border-primary-300 bg-primary-50 text-primary-900 shadow-sm dark:border-primary-700 dark:bg-primary-900/20 dark:text-primary-100'
-                    : 'border-gray-100 hover:bg-gray-50 dark:border-dark-700 dark:hover:bg-dark-700/60'"
-                  @click="configForm.keyword_blocking_mode = option.value"
-                >
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="text-sm font-semibold">{{ option.label }}</span>
-                    <span
-                      class="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border"
-                      :class="configForm.keyword_blocking_mode === option.value
-                        ? 'border-primary-500 bg-primary-500 text-white'
-                        : 'border-gray-300 text-transparent dark:border-dark-500'"
-                    >
-                      <Icon name="check" size="xs" :stroke-width="2" />
-                    </span>
-                  </div>
-                  <p class="mt-1 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ option.description }}</p>
-                </button>
-              </div>
-            </div>
-
-            <div>
-              <div class="mb-2 flex items-center justify-between">
-                <label class="input-label mb-0">{{ t('admin.riskControl.blockedKeywords') }}</label>
-                <span class="inline-flex rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-500 dark:bg-dark-700 dark:text-gray-300">
-                  {{ t('admin.riskControl.blockedKeywordCount', { count: blockedKeywordCount }) }}
-                </span>
-              </div>
-              <textarea
-                v-model="configForm.blocked_keywords_text"
-                class="input min-h-52 resize-y font-mono text-sm"
-                :placeholder="t('admin.riskControl.blockedKeywordsPlaceholder')"
-                :disabled="configForm.keyword_blocking_mode === 'api_only'"
-              ></textarea>
-              <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                {{ t('admin.riskControl.blockedKeywordsLimit', { max: blockedKeywordMax }) }}
-              </p>
-            </div>
+          <div v-else-if="activeSettingsTab === 'keywords'" class="rounded-xl border border-primary-100 bg-primary-50/40 p-5 dark:border-primary-900 dark:bg-primary-950/20">
+            <p class="text-sm leading-6 text-gray-600 dark:text-gray-300">{{ t('keywordRules.independentHint') }}</p>
+            <a href="/admin/keyword-rules" class="btn btn-primary mt-4">{{ t('keywordRules.title') }}</a>
           </div>
 
           <div v-else class="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -1207,7 +1148,6 @@ type RiskThresholdRow = {
 const maxModerationTestImages = 1
 const maxModerationTestImageSize = 8 * 1024 * 1024
 const maxVisibleApiKeyRows: number = 3
-const blockedKeywordMax = 10000
 const riskThresholdDefaults: Record<string, number> = {
   harassment: 98,
   'harassment/threatening': 90,
@@ -1375,24 +1315,6 @@ const modeOptions = computed<SelectOption[]>(() => [
   { value: 'off', label: t('admin.riskControl.modeOff') },
 ])
 
-const keywordBlockingModeOptions = computed<Array<{ value: KeywordBlockingMode; label: string; description: string }>>(() => [
-  {
-    value: 'keyword_and_api',
-    label: t('admin.riskControl.keywordModeKeywordAndApi'),
-    description: t('admin.riskControl.keywordModeKeywordAndApiDesc'),
-  },
-  {
-    value: 'keyword_only',
-    label: t('admin.riskControl.keywordModeKeywordOnly'),
-    description: t('admin.riskControl.keywordModeKeywordOnlyDesc'),
-  },
-  {
-    value: 'api_only',
-    label: t('admin.riskControl.keywordModeApiOnly'),
-    description: t('admin.riskControl.keywordModeApiOnlyDesc'),
-  },
-])
-
 const modelFilterOptions = computed<Array<{ value: ContentModerationModelFilterType; label: string; description: string }>>(() => [
   {
     value: 'all',
@@ -1410,60 +1332,6 @@ const modelFilterOptions = computed<Array<{ value: ContentModerationModelFilterT
     description: t('admin.riskControl.modelFilterExcludeDesc'),
   },
 ])
-
-type KeywordNoticeView = {
-  title: string
-  description: string
-  icon: 'infoCircle' | 'exclamationTriangle'
-  toneClass: string
-  iconClass: string
-  titleClass: string
-}
-
-const keywordNoticeTones = {
-  info: {
-    icon: 'infoCircle' as const,
-    toneClass: 'border-primary-100 bg-primary-50/60 dark:border-primary-900/40 dark:bg-primary-900/10',
-    iconClass: 'mt-0.5 flex-shrink-0 text-primary-500 dark:text-primary-300',
-    titleClass: 'text-primary-700 dark:text-primary-200',
-  },
-  warning: {
-    icon: 'exclamationTriangle' as const,
-    toneClass: 'border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/20',
-    iconClass: 'mt-0.5 flex-shrink-0 text-amber-500 dark:text-amber-300',
-    titleClass: 'text-amber-700 dark:text-amber-200',
-  },
-}
-
-const keywordNotice = computed<KeywordNoticeView>(() => {
-  const strategy = configForm.keyword_blocking_mode
-  if (strategy === 'api_only') {
-    return {
-      ...keywordNoticeTones.info,
-      title: t('admin.riskControl.keywordModeApiOnlyNotice'),
-      description: t('admin.riskControl.keywordModeApiOnlyDesc'),
-    }
-  }
-  if (configForm.mode !== 'pre_block') {
-    return {
-      ...keywordNoticeTones.warning,
-      title: t('admin.riskControl.blockedKeywordsModeWarning', { mode: modeLabel(configForm.mode) }),
-      description: t('admin.riskControl.blockedKeywordsDescription'),
-    }
-  }
-  if (strategy === 'keyword_only') {
-    return {
-      ...keywordNoticeTones.info,
-      title: t('admin.riskControl.keywordModeKeywordOnlyNotice'),
-      description: t('admin.riskControl.keywordModeKeywordOnlyDesc'),
-    }
-  }
-  return {
-    ...keywordNoticeTones.info,
-    title: t('admin.riskControl.blockedKeywordsPreBlockHint'),
-    description: t('admin.riskControl.blockedKeywordsDescription'),
-  }
-})
 
 const resultOptions = computed<SelectOption[]>(() => [
   { value: '', label: t('admin.riskControl.result.all') },
@@ -1521,7 +1389,6 @@ const inputApiKeyCount = computed(() => parseApiKeys(configForm.api_keys_text).l
 
 const blockedKeywordList = computed(() => parseBlockedKeywords(configForm.blocked_keywords_text))
 
-const blockedKeywordCount = computed(() => blockedKeywordList.value.length)
 
 const pendingDeletedApiKeyCount = computed(() => pendingDeleteApiKeyHashes.value.length)
 

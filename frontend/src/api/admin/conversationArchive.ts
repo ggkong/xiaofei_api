@@ -1,3 +1,4 @@
+import type { KeywordHit } from './keywordRules'
 export interface ArchiveRecord {
   id: number
   request_id: string
@@ -11,6 +12,7 @@ export interface ArchiveRecord {
   wire_model?: string
   model_conflict?: boolean
   reply_source?: string
+  keyword_rules?: KeywordHit[]
   http_status: number
   status: 'complete' | 'interrupted' | 'error'
   truncated: boolean

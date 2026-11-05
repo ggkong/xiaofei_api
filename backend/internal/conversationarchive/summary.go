@@ -3,6 +3,7 @@ package conversationarchive
 import (
 	"context"
 	"encoding/json"
+	"github.com/Wei-Shaw/sub2api/internal/keywordrules"
 	"strings"
 	"unicode/utf8"
 
@@ -12,11 +13,12 @@ import (
 type requestCaptureKey struct{}
 
 type ModelMetadata struct {
-	UpstreamModel string `json:"upstream_model"`
-	ResponseModel string `json:"response_model"`
-	WireModel     string `json:"wire_model"`
-	Conflict      bool   `json:"conflict"`
-	Source        string `json:"source"`
+	KeywordRules  []keywordrules.Hit `json:"keyword_rules,omitempty"`
+	UpstreamModel string             `json:"upstream_model"`
+	ResponseModel string             `json:"response_model"`
+	WireModel     string             `json:"wire_model"`
+	Conflict      bool               `json:"conflict"`
+	Source        string             `json:"source"`
 }
 
 func AnnotateResponse(raw json.RawMessage, meta ModelMetadata, local bool) json.RawMessage {

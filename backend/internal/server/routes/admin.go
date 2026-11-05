@@ -36,6 +36,7 @@ func RegisterAdminRoutes(
 	admin.Use(h.Admin.Account.ScopedAdminKeyAccounts)
 	{
 		registerConversationArchiveRoutes(admin, firstArchive(archives))
+		registerKeywordRuleRoutes(admin, settingService)
 
 		// 部署与运营合规确认
 		registerAdminComplianceRoutes(admin, h)

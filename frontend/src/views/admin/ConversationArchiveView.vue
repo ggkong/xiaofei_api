@@ -13,12 +13,11 @@
           <span v-if="captureEnabled === true && !capturePaused" class="mr-2 hidden items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 sm:inline-flex"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />{{ retentionDays === 0 ? t('conversationArchive.permanentActive') : t('conversationArchive.captureActive') }}</span>
           <button class="btn btn-secondary" :aria-expanded="showStorage" @click="showStorage = !showStorage">{{ t('conversationArchive.storageTitle') }}</button>
           <button class="btn btn-secondary" :disabled="loading" @click="load">{{ t('conversationArchive.refresh') }}</button>
-          <button class="btn btn-primary" :aria-expanded="showRules" @click="showRules = !showRules">{{ t('conversationArchive.keywords') }}</button>
+          <a href="/admin/keyword-rules" class="btn btn-primary">{{ t('conversationArchive.keywords') }}</a>
         </div>
       </header>
 
       <ConversationArchiveStorage v-if="showStorage" @close="showStorage = false" @saved="load" />
-      <ConversationKeywordRules v-if="showRules" @close="showRules = false" />
       <div v-if="captureEnabled === false" class="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{{ t('conversationArchive.disabled') }}</div>
       <div v-if="capturePaused" class="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{{ t('conversationArchive.capacityPaused') }}</div>
 
@@ -99,6 +98,7 @@
         </div>
         <div class="flex gap-5 border-b border-gray-100 px-5 dark:border-gray-800" role="tablist" :aria-label="t('conversationArchive.detail')"><button v-for="tab in ['exchange', 'context', 'models'] as const" :key="tab" class="border-b-2 py-3 text-sm font-medium" :class="detailTab === tab ? 'border-primary-600 text-primary-600 dark:text-primary-400' : 'border-transparent text-gray-500'" role="tab" :aria-selected="detailTab === tab" @click="detailTab = tab">{{ t(`conversationArchive.${tab}`) }}</button></div>
         <div class="space-y-5 p-5" role="tabpanel">
+          <div v-if="detail.keyword_rules?.length" class="flex flex-wrap items-center gap-2 rounded-xl bg-primary-50 px-3 py-3 text-xs dark:bg-primary-950"><span class="font-medium text-primary-700 dark:text-primary-300">{{ t('keywordRules.matchedRules') }}</span><span v-for="hit in detail.keyword_rules" :key="hit.rule_id" class="rounded-md bg-white px-2 py-1 text-gray-600 dark:bg-gray-900 dark:text-gray-300">{{ hit.rule_name }} · {{ t(`keywordRules.actions.${hit.action}`) }}</span></div>
           <p v-if="detail.truncated" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">{{ t('conversationArchive.limitNotice') }}</p>
           <template v-if="detailTab === 'exchange'">
             <div class="grid gap-5 lg:grid-cols-2">
@@ -123,7 +123,6 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import ConversationKeywordRules from '@/components/admin/ConversationKeywordRules.vue'
 import ConversationArchiveStorage from '@/components/admin/ConversationArchiveStorage.vue'
 import ConversationContext from '@/components/admin/ConversationContext.vue'
 import type { ArchivePage, ArchiveRecord } from '@/api/admin/conversationArchive'
@@ -131,7 +130,6 @@ import { apiClient } from '@/api/client'
 import { archiveDateRange, archiveRequestMessages, archiveResponseContext, archiveContextMessages } from '@/utils/conversationArchive'
 
 const { t, locale } = useI18n()
-const showRules = ref(false)
 const showStorage = ref(false)
 const retentionDays = ref<number | null>(null)
 const viewMode = ref<'groups' | 'calls'>('groups')

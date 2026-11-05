@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/keywordrules"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"golang.org/x/sync/singleflight"
@@ -117,6 +118,8 @@ type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[i
 
 // SettingService 系统设置服务
 type SettingService struct {
+	keywordRulesOnce            sync.Once
+	keywordRules                *keywordrules.Manager
 	scopedAdminKeyRepo          ScopedAdminKeyRepository
 	settingRepo                 SettingRepository
 	defaultSubGroupReader       DefaultSubscriptionGroupReader
@@ -443,4 +446,13 @@ func (s *SettingService) getStringOrDefault(settings map[string]string, key, def
 		return value
 	}
 	return defaultValue
+}
+
+// KeywordRules returns the shared, independently configured text-rule manager.
+func (s *SettingService) KeywordRules() *keywordrules.Manager {
+	if s == nil || s.settingRepo == nil {
+		return nil
+	}
+	s.keywordRulesOnce.Do(func() { s.keywordRules = keywordrules.NewManager(s.settingRepo) })
+	return s.keywordRules
 }
