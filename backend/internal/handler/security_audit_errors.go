@@ -15,6 +15,9 @@ import (
 )
 
 func (h *OpenAIGatewayHandler) openAISecurityAuditError(c *gin.Context, decision *securityaudit.Decision) {
+	if writeLocalKeywordReply(c, decision) {
+		return
+	}
 	if decision == nil {
 		return
 	}
@@ -32,6 +35,9 @@ func (h *OpenAIGatewayHandler) openAISecurityAuditError(c *gin.Context, decision
 }
 
 func (h *GatewayHandler) openAISecurityAuditError(c *gin.Context, decision *securityaudit.Decision) {
+	if writeLocalKeywordReply(c, decision) {
+		return
+	}
 	if decision == nil {
 		return
 	}
@@ -49,6 +55,9 @@ func (h *GatewayHandler) openAISecurityAuditError(c *gin.Context, decision *secu
 }
 
 func (h *GatewayHandler) responsesSecurityAuditError(c *gin.Context, decision *securityaudit.Decision) {
+	if writeLocalKeywordReply(c, decision) {
+		return
+	}
 	if decision == nil {
 		return
 	}
@@ -62,6 +71,9 @@ func (h *GatewayHandler) responsesSecurityAuditError(c *gin.Context, decision *s
 }
 
 func (h *GatewayHandler) anthropicSecurityAuditError(c *gin.Context, decision *securityaudit.Decision) {
+	if writeLocalKeywordReply(c, decision) {
+		return
+	}
 	if decision == nil {
 		return
 	}
@@ -79,6 +91,9 @@ func (h *GatewayHandler) anthropicSecurityAuditError(c *gin.Context, decision *s
 }
 
 func (h *OpenAIGatewayHandler) anthropicSecurityAuditError(c *gin.Context, decision *securityaudit.Decision) {
+	if writeLocalKeywordReply(c, decision) {
+		return
+	}
 	if decision == nil {
 		return
 	}
@@ -96,6 +111,9 @@ func (h *OpenAIGatewayHandler) anthropicSecurityAuditError(c *gin.Context, decis
 }
 
 func googleSecurityAuditError(c *gin.Context, decision *securityaudit.Decision) {
+	if writeLocalKeywordReply(c, decision) {
+		return
+	}
 	if decision == nil {
 		return
 	}
@@ -128,6 +146,10 @@ func googleSecurityAuditError(c *gin.Context, decision *securityaudit.Decision) 
 }
 
 func writeSecurityAuditWSError(ctx context.Context, conn *coderws.Conn, decision *securityaudit.Decision) {
+	if decision != nil && decision.Legacy != nil && decision.Legacy.Reply != nil && conn != nil {
+		writeLocalKeywordReplyWS(ctx, conn, decision.Legacy.Reply)
+		return
+	}
 	if conn == nil || decision == nil {
 		return
 	}
@@ -161,6 +183,9 @@ func (d legacyContentModerationDecision) toService() *service.ContentModerationD
 }
 
 func securityAuditWSCloseStatus(decision *securityaudit.Decision) coderws.StatusCode {
+	if decision != nil && decision.Legacy != nil && decision.Legacy.Reply != nil {
+		return coderws.StatusNormalClosure
+	}
 	if decision == nil {
 		return coderws.StatusInternalError
 	}
@@ -174,6 +199,9 @@ func securityAuditWSCloseStatus(decision *securityaudit.Decision) coderws.Status
 }
 
 func securityAuditWSCloseReason(decision *securityaudit.Decision) string {
+	if decision != nil && decision.Legacy != nil && decision.Legacy.Reply != nil {
+		return "keyword reply completed"
+	}
 	if decision == nil {
 		return securityaudit.ErrorCodeUnavailable
 	}

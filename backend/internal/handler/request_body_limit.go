@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/conversationarchive"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 )
 
@@ -30,7 +31,11 @@ func buildBodyTooLargeMessage(limit int64) string {
 }
 
 func readLenientJSONRequestBodyWithPrealloc(req *http.Request, cfg *config.Config) ([]byte, error) {
-	return pkghttputil.ReadLenientJSONRequestBodyWithPrealloc(req, gatewayMaxBodySize(cfg))
+	body, err := pkghttputil.ReadLenientJSONRequestBodyWithPrealloc(req, gatewayMaxBodySize(cfg))
+	if err == nil {
+		conversationarchive.ObserveRequestBody(req.Context(), body)
+	}
+	return body, err
 }
 
 func gatewayMaxBodySize(cfg *config.Config) int64 {

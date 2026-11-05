@@ -92,6 +92,9 @@ func (c *Coordinator) checkLegacy(ctx context.Context, req Request) (*LegacyDeci
 }
 
 func prioritize(legacy *LegacyDecision, prompt *PromptDecision) Decision {
+	if legacy != nil && legacy.Reply != nil {
+		return Decision{Kind: DecisionKind("reply"), HTTPStatus: http.StatusOK, Legacy: legacy, Prompt: prompt, AllowNextStage: false}
+	}
 	if legacy != nil && legacy.Blocked {
 		status := legacy.StatusCode
 		if status < 400 || status > 599 {

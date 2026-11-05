@@ -209,6 +209,15 @@ func observedUpstreamResponseModel(c *gin.Context) string {
 	return upstreamResponseModelObserverFromContext(c).Model()
 }
 
+// ArchiveModelObservation separates the dispatched model from the provider's
+// response declaration before client-facing aliases or protocol conversion.
+func ArchiveModelObservation(c *gin.Context) (string, string, bool) {
+	if c == nil {
+		return "", "", false
+	}
+	return c.GetString(OpsUpstreamModelKey), observedUpstreamResponseModel(c), observedUpstreamResponseModelConflict(c)
+}
+
 func observedUpstreamResponseModelConflict(c *gin.Context) bool {
 	return upstreamResponseModelObserverFromContext(c).Conflict()
 }

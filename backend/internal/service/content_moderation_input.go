@@ -24,7 +24,8 @@ func extractContentModerationKeywordText(protocol string, body []byte) string {
 }
 
 type moderationTextCollector struct {
-	filterReminders bool
+	filterReminders    bool
+	preserveWhitespace bool
 }
 
 func extractContentModerationInput(protocol string, body []byte, filterReminders bool) ContentModerationInput {
@@ -392,7 +393,9 @@ func limitContentModerationImages(images []string) []string {
 }
 
 func (collector moderationTextCollector) addModerationText(parts *[]string, text string) {
-	text = strings.TrimSpace(text)
+	if !collector.preserveWhitespace {
+		text = strings.TrimSpace(text)
+	}
 	if text == "" {
 		return
 	}

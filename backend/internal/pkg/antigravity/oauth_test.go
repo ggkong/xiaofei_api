@@ -785,8 +785,8 @@ func TestScopes_包含必要范围(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	if os.Getenv(AntigravityOAuthClientSecretEnv) == "" {
-		os.Setenv(AntigravityOAuthClientSecretEnv, "test-only-client-secret")
+	if err := os.Setenv(AntigravityOAuthClientSecretEnv, "test-only-client-secret"); err != nil {
+		os.Exit(1)
 	}
 	os.Exit(m.Run())
 }

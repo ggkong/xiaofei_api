@@ -49,6 +49,9 @@ export interface ContentModerationConfig {
   pre_hash_check_enabled: boolean
   blocked_keywords: string[]
   keyword_blocking_mode: KeywordBlockingMode
+  keyword_match_mode?: 'exact' | 'literal' | 'contains'
+  keyword_auto_reply_enabled?: boolean
+  keyword_reply?: string
   model_filter: ContentModerationModelFilter
   cyber_policy_exclude_from_ban_count: boolean
 }
@@ -134,6 +137,9 @@ export interface UpdateContentModerationConfig {
   pre_hash_check_enabled?: boolean
   blocked_keywords?: string[]
   keyword_blocking_mode?: KeywordBlockingMode
+  keyword_match_mode?: 'exact' | 'literal' | 'contains'
+  keyword_auto_reply_enabled?: boolean
+  keyword_reply?: string
   model_filter?: ContentModerationModelFilter
   cyber_policy_exclude_from_ban_count?: boolean
 }

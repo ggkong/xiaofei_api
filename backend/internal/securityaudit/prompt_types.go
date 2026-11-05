@@ -147,13 +147,21 @@ type PromptDecision struct {
 }
 
 type LegacyDecision struct {
-	Allowed    bool   `json:"allowed"`
-	Blocked    bool   `json:"blocked"`
-	Flagged    bool   `json:"flagged"`
-	Message    string `json:"message"`
-	StatusCode int    `json:"status_code"`
-	ErrorCode  string `json:"error_code"`
-	Action     string `json:"action"`
+	Allowed    bool               `json:"allowed"`
+	Blocked    bool               `json:"blocked"`
+	Flagged    bool               `json:"flagged"`
+	Message    string             `json:"message"`
+	StatusCode int                `json:"status_code"`
+	ErrorCode  string             `json:"error_code"`
+	Action     string             `json:"action"`
+	Reply      *LocalKeywordReply `json:"reply,omitempty"`
+}
+
+type LocalKeywordReply struct {
+	Text     string `json:"text"`
+	Model    string `json:"model"`
+	Protocol string `json:"protocol"`
+	Stream   bool   `json:"stream"`
 }
 
 type Decision struct {

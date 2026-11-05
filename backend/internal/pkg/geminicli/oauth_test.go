@@ -748,8 +748,8 @@ func TestEffectiveOAuthConfig_CustomClient_NoScopeFiltering(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	if os.Getenv(GeminiCLIOAuthClientSecretEnv) == "" {
-		os.Setenv(GeminiCLIOAuthClientSecretEnv, "test-only-cli-client-secret")
+	if err := os.Setenv(GeminiCLIOAuthClientSecretEnv, "test-only-cli-client-secret"); err != nil {
+		os.Exit(1)
 	}
 	os.Exit(m.Run())
 }

@@ -9,6 +9,7 @@ type contentModerationKeywordMatcher struct {
 	edges           []contentModerationKeywordEdge
 	rootTransitions [256]int32
 	keywords        []string
+	caseSensitive   bool
 }
 
 type contentModerationKeywordNode struct {
@@ -30,6 +31,10 @@ type contentModerationKeywordBuildEdge struct {
 }
 
 func newContentModerationKeywordMatcher(keywords []string) *contentModerationKeywordMatcher {
+	return newKeywordMatcherWithCase(keywords, false)
+}
+
+func newKeywordMatcherWithCase(keywords []string, caseSensitive bool) *contentModerationKeywordMatcher {
 	if len(keywords) == 0 {
 		return nil
 	}
@@ -43,7 +48,11 @@ func newContentModerationKeywordMatcher(keywords []string) *contentModerationKey
 			continue
 		}
 		state := int32(0)
-		for _, label := range []byte(strings.ToLower(keyword)) {
+		normalized := keyword
+		if !caseSensitive {
+			normalized = strings.ToLower(keyword)
+		}
+		for _, label := range []byte(normalized) {
 			next := contentModerationKeywordBuildTransition(buildNodes, buildEdges, state, label)
 			if next < 0 {
 				next = int32(len(buildNodes))
@@ -123,6 +132,7 @@ func newContentModerationKeywordMatcher(keywords []string) *contentModerationKey
 		edges:           edges,
 		rootTransitions: rootTransitions,
 		keywords:        originalKeywords,
+		caseSensitive:   caseSensitive,
 	}
 }
 
@@ -168,7 +178,10 @@ func (m *contentModerationKeywordMatcher) Match(text string) (string, bool) {
 	if m == nil || text == "" || len(m.nodes) == 0 || len(m.keywords) == 0 {
 		return "", false
 	}
-	lower := strings.ToLower(text)
+	lower := text
+	if !m.caseSensitive {
+		lower = strings.ToLower(text)
+	}
 	state := int32(0)
 	bestKeyword := int32(-1)
 	for index := 0; index < len(lower); index++ {
