@@ -88,7 +88,8 @@ func extractTexts(input Input, needed map[string]bool) (map[string]string, error
 		role := item.Get("role").String()
 		kind := item.Get("type").String()
 		isUser := role == "user" || (role == "" && (kind == "" || kind == "message" || kind == "input_text"))
-		if !needed["context"] && !(isUser && needed["all_user"]) && !(isUser && needed["latest_user"] && index == lastUser) {
+		scanItem := needed["context"] || (isUser && (needed["all_user"] || (needed["latest_user"] && index == lastUser)))
+		if !scanItem {
 			continue
 		}
 		content := item.Get("content")
