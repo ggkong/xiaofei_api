@@ -38,7 +38,7 @@ func KeywordRules(manager *keywordrules.Manager, maxBytes int64) gin.HandlerFunc
 			c.Next()
 			return
 		}
-		if manager == nil || !supported || c.Request.Method != http.MethodPost || !strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "application/json") {
+		if manager == nil || !supported || c.Request.Method != http.MethodPost {
 			c.Next()
 			return
 		}
@@ -77,7 +77,12 @@ func KeywordRules(manager *keywordrules.Manager, maxBytes int64) gin.HandlerFunc
 			c.Next()
 			return
 		}
-		model := gjson.GetBytes(body, "model").String()
+		modelField := gjson.GetBytes(body, "model")
+		if protocol != "gemini" && modelField.Type != gjson.String {
+			c.Next()
+			return
+		}
+		model := modelField.String()
 		if protocol == "gemini" {
 			model = strings.TrimPrefix(c.Param("modelAction"), "/")
 			if index := strings.LastIndex(model, ":"); index >= 0 {

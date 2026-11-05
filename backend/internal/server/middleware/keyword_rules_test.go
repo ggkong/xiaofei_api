@@ -133,3 +133,22 @@ func TestKeywordRulesOffAndNearMissesForwardUnchanged(t *testing.T) {
 		require.Equal(t, 204, response.Code)
 	}
 }
+
+func TestKeywordRulesHandleJSONRegardlessOfContentType(t *testing.T) {
+	for _, contentType := range []string{"", "text/plain", "application/json; charset=utf-8"} {
+		t.Run(contentType, func(t *testing.T) {
+			router := keywordRouter(keywordManager(t, "reply", true), func(c *gin.Context) { c.Status(599) })
+			request := keywordRequest(`{"model":"alias","messages":[{"role":"user","content":"EXACT"}]}`)
+			request.Header.Set("Content-Type", contentType)
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			require.Equal(t, 200, response.Code)
+			require.Equal(t, "true", response.Header().Get("X-Sub2API-Keyword-Reply"))
+		})
+	}
+	// Leave invalid model types to normal request validation.
+	router := keywordRouter(keywordManager(t, "reply", true), func(c *gin.Context) { c.Status(204) })
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, keywordRequest(`{"model":123,"messages":[{"role":"user","content":"EXACT"}]}`))
+	require.Equal(t, 204, response.Code)
+}
