@@ -125,9 +125,9 @@ func contentTextAtDepth(value gjson.Result, limit, depth int) string {
 			text := contentTextAtDepth(part, limit, depth+1)
 			if text != "" {
 				if result.Len() > 0 {
-					result.WriteByte('\n')
+					_ = result.WriteByte('\n')
 				}
-				result.WriteString(text)
+				_, _ = result.WriteString(text)
 			}
 			return result.Len() < limit
 		})
@@ -171,7 +171,7 @@ func ReplyText(raw []byte, limit int) string {
 	var result strings.Builder
 	root.Get("output").ForEach(func(_, item gjson.Result) bool {
 		if item.Get("type").String() == "message" || item.Get("role").String() == "assistant" {
-			result.WriteString(contentText(item.Get("content"), limit))
+			_, _ = result.WriteString(contentText(item.Get("content"), limit))
 		}
 		return result.Len() < limit
 	})

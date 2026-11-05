@@ -51,7 +51,10 @@ func keywordReplyPayload(reply *securityaudit.LocalKeywordReply) (any, []keyword
 			{"response.completed", gin.H{"response": response}},
 		}
 		for i := range events {
-			data := events[i].data.(gin.H)
+			data, ok := events[i].data.(gin.H)
+			if !ok {
+				continue
+			}
 			data["type"], data["sequence_number"] = events[i].name, i
 		}
 		return response, events

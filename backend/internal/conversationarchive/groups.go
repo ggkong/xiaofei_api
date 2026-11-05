@@ -27,7 +27,7 @@ func prepareGrouping(r *Record) {
 	if r.PromptHash == "" {
 		r.PromptHash = PromptDigest(r.RequestBody)
 	}
-	identity := "unknown/" + r.RequestID
+	var identity string
 	// Formatting pointer addresses would split one member's requests randomly.
 	if r.UserID != nil && r.APIKeyID != nil {
 		identity = fmt.Sprintf("%d/%d", *r.UserID, *r.APIKeyID)
