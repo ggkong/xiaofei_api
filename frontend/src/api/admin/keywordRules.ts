@@ -6,6 +6,7 @@ export type KeywordProtocol = 'openai_chat_completions' | 'openai_responses' | '
 export interface KeywordRule {
   id: string
   name: string
+  description: string
   category: string
   enabled: boolean
   priority: number

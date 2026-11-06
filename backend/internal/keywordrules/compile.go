@@ -90,6 +90,9 @@ func compile(policy Policy) (*compiledPolicy, error) {
 		if r.Name == "" || !validString(r.Name, 100) || !validString(r.Category, 60) {
 			return nil, fmt.Errorf("rule name is required (up to 100 characters)")
 		}
+		if !validString(r.Description, 2000) {
+			return nil, fmt.Errorf("rule description must contain at most 2000 valid characters")
+		}
 		if r.Priority < 0 || r.Priority > 100000 {
 			return nil, fmt.Errorf("rule priority must be between 0 and 100000")
 		}

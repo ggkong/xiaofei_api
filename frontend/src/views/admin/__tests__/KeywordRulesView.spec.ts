@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import KeywordRulesView from '../KeywordRulesView.vue'
+import KeywordAIDialog from '@/components/keyword-rules/KeywordAIDialog.vue'
 import { createKeywordRule } from '@/utils/keywordRules'
 
 const { get, put, post } = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), post: vi.fn() }))
@@ -19,7 +20,7 @@ async function render() {
 }
 beforeEach(() => {
   get.mockReset(); put.mockReset(); post.mockReset()
-  get.mockImplementation(async (path: string) => ({ data: path === '/admin/keyword-rules' ? JSON.parse(JSON.stringify(base)) : [] }))
+  get.mockImplementation(async (path: string) => ({ data: path === '/admin/keyword-rules' ? JSON.parse(JSON.stringify(base)) : path === '/keys' ? { items: [] } : [] }))
   put.mockImplementation(async (_path: string, body: unknown) => ({ data: { ...body as object, revision: 'rev-two' } }))
 })
 describe('independent keyword rules console', () => {
@@ -62,4 +63,18 @@ describe('independent keyword rules console', () => {
     expect(wrapper.get('[role="alert"]').text()).toBe('keywordRules.conflict')
     expect(input.element.value).toBe('保留我的草稿')
   })
+  it('accepts AI suggestions into a paused draft and saves their usage notes only on explicit save', async () => {
+    const wrapper = await render()
+    await wrapper.findAll('button').find(button => button.text() === 'keywordRules.aiTitle')!.trigger('click')
+    await flushPromises()
+    const rule = { ...createKeywordRule('AI 建议'), enabled: false, description: '完整短语避免误触发', keywords: ['查看用量'], reply: '到用量页查看' }
+    wrapper.findComponent(KeywordAIDialog).vm.$emit('apply', { rules: [rule] })
+    await flushPromises()
+    expect(put).not.toHaveBeenCalled()
+    expect(wrapper.get('input[maxlength="100"]').element.value).toBe('AI 建议')
+    await wrapper.findAll('button').find(button => button.text() === 'keywordRules.save')!.trigger('click')
+    await flushPromises()
+    expect(put).toHaveBeenCalledWith('/admin/keyword-rules', expect.objectContaining({ enabled: false, rules: expect.arrayContaining([expect.objectContaining({ enabled: false, description: '完整短语避免误触发', keywords: ['查看用量'] })]) }))
+  })
+
 })

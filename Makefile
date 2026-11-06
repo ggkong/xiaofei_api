@@ -7,6 +7,9 @@ FRONTEND_CRITICAL_VITEST := \
 	src/views/admin/__tests__/ConversationArchiveView.spec.ts \
 	src/views/admin/__tests__/KeywordRulesView.spec.ts \
 	src/utils/__tests__/keywordRules.spec.ts \
+	src/utils/__tests__/keywordAI.spec.ts \
+	src/api/__tests__/keywordAI.spec.ts \
+	src/components/keyword-rules/__tests__/KeywordAIDialog.spec.ts \
 	src/i18n/__tests__/localeKeyCompleteness.spec.ts \
 	src/api/__tests__/client.spec.ts \
 	src/api/__tests__/tokenRefresh.spec.ts \

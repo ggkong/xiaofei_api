@@ -200,10 +200,12 @@ func TestKeywordRuleManagerRevisionImmediateSwitchesAndMigration(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, got.Configured)
 	policy.Rules = []Rule{testRule()}
+	policy.Rules[0].Description = "Specific phrases avoid false positives."
 	policy.Enabled = true
 	saved, err := m.Save(ctx, policy)
 	require.NoError(t, err)
 	require.False(t, saved.Legacy)
+	require.Equal(t, policy.Rules[0].Description, saved.Rules[0].Description)
 	got, err = m.Evaluate(ctx, testInput("Hello"))
 	require.NoError(t, err)
 	require.Equal(t, "reply", got.Action)
@@ -291,4 +293,14 @@ func TestKeywordLegacyMigrationPreservesDisabledModeAndExemptions(t *testing.T) 
 	require.Equal(t, []int64{12, 34}, p.Rules[0].ExcludeUserIDs)
 	_, err = compile(p)
 	require.NoError(t, err)
+}
+
+func TestKeywordRuleDescriptionIsBoundedAndDoesNotAffectMatching(t *testing.T) {
+	r := testRule()
+	r.Description = "Usage notes and examples for administrators"
+	require.Equal(t, "reply", check(t, []Rule{r}, "Hello").Action)
+	require.Empty(t, check(t, []Rule{r}, r.Description).Hits)
+	r.Description = strings.Repeat("x", 2001)
+	_, err := compile(Policy{Rules: []Rule{r}})
+	require.Error(t, err)
 }

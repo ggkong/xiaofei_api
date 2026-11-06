@@ -5,7 +5,7 @@ export class KeywordImportError extends Error {
 }
 export const ruleID = () => `rule_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
 export function createKeywordRule(name = ''): KeywordRule {
-  return { id: ruleID(), name, category: '', enabled: true, priority: 100, keywords: [], exclude_keywords: [], match_mode: 'exact', keyword_logic: 'any', case_sensitive: true, scan_scope: 'latest_user', action: 'reply', reply: '', injection: '', injection_position: 'append', stop_on_match: false, group_ids: [], user_ids: [], exclude_user_ids: [], models: [], exclude_models: [], protocols: [] }
+  return { id: ruleID(), name, description: '', category: '', enabled: true, priority: 100, keywords: [], exclude_keywords: [], match_mode: 'exact', keyword_logic: 'any', case_sensitive: true, scan_scope: 'latest_user', action: 'reply', reply: '', injection: '', injection_position: 'append', stop_on_match: false, group_ids: [], user_ids: [], exclude_user_ids: [], models: [], exclude_models: [], protocols: [] }
 }
 export const copyPolicy = (policy: KeywordPolicy): KeywordPolicy => JSON.parse(JSON.stringify(policy))
 export const splitKeywords = (text: string, preserveWhitespace = false) => text.split(/\r?\n/).map(value => preserveWhitespace ? value : value.trim()).filter(Boolean)
@@ -52,7 +52,7 @@ function normalizeRule(value: unknown): KeywordRule {
   const source = record(value)
   if (!source) throw new KeywordImportError('importInvalidJSON')
   const rule = createKeywordRule(typeof source.name === 'string' ? source.name : '')
-  const stringFields = ['id', 'name', 'category', 'reply', 'injection'] as const
+  const stringFields = ['id', 'name', 'description', 'category', 'reply', 'injection'] as const
   for (const field of stringFields) if (source[field] !== undefined) { if (typeof source[field] !== 'string') throw new KeywordImportError('importInvalidJSON'); rule[field] = source[field] }
   for (const field of ['enabled', 'case_sensitive', 'stop_on_match'] as const) if (source[field] !== undefined) { if (typeof source[field] !== 'boolean') throw new KeywordImportError('importInvalidJSON'); rule[field] = source[field] }
   rule.keywords = strings(source.keywords ?? [])
@@ -119,6 +119,7 @@ export function validateKeywordPolicy(policy: KeywordPolicy): string | null {
   for (const rule of policy.rules) {
     if (![...rule.group_ids, ...rule.user_ids, ...rule.exclude_user_ids].every(id => Number.isSafeInteger(id) && id > 0) || !Number.isInteger(rule.priority) || rule.priority < 0 || rule.priority > 100000) return 'scopeError'
     if (!rule.name.trim() || !rule.keywords.length || (rule.action === 'reply' && !rule.reply.trim()) || (rule.action === 'inject' && !rule.injection.trim())) return 'incompleteRule'
+    if ([...(rule.description || '')].length > 2000) return 'capacityError'
     if (rule.keywords.length > 5000 || [...rule.keywords, ...rule.exclude_keywords].some(word => [...word].length > 512)) return 'capacityError'
   }
   return null

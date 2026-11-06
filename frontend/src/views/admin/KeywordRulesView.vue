@@ -17,7 +17,7 @@
         <div class="grid grid-cols-2 gap-3 lg:grid-cols-4"><div v-for="stat in stats" :key="stat.label" class="rounded-xl border border-gray-200 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-900"><p class="text-xs text-gray-500">{{ t(`keywordRules.${stat.label}`) }}</p><p class="mt-2 text-2xl font-semibold tabular-nums text-gray-900 dark:text-white">{{ stat.value.toLocaleString() }}</p></div></div>
         <section class="card overflow-hidden">
           <div class="space-y-3 border-b border-gray-100 p-4 dark:border-gray-800">
-            <div class="flex flex-wrap items-center gap-3"><input v-model="query" class="input min-w-40 flex-1" maxlength="200" :aria-label="t('keywordRules.search')" :placeholder="t('keywordRules.searchPlaceholder')" /><select v-model="searchScope" class="input w-36" :aria-label="t('keywordRules.searchScope')"><option v-for="scope in ['all', 'name', 'keywords', 'reply', 'injection']" :key="scope" :value="scope">{{ t(`keywordRules.searchScopes.${scope}`) }}</option></select><button class="btn btn-secondary" @click="showImport = true">{{ t('keywordRules.import') }}</button><button class="btn btn-primary" @click="addRule">+ {{ t('keywordRules.newRule') }}</button></div>
+            <div class="flex flex-wrap items-center gap-3"><input v-model="query" class="input min-w-40 flex-1" maxlength="200" :aria-label="t('keywordRules.search')" :placeholder="t('keywordRules.searchPlaceholder')" /><select v-model="searchScope" class="input w-36" :aria-label="t('keywordRules.searchScope')"><option v-for="scope in ['all', 'name', 'keywords', 'reply', 'injection']" :key="scope" :value="scope">{{ t(`keywordRules.searchScopes.${scope}`) }}</option></select><button class="btn btn-secondary" :disabled="saving" @click="showAI = true">{{ t('keywordRules.aiTitle') }}</button><button class="btn btn-secondary" @click="showImport = true">{{ t('keywordRules.import') }}</button><button class="btn btn-primary" @click="addRule">+ {{ t('keywordRules.newRule') }}</button></div>
             <div class="flex flex-wrap items-center gap-2"><select v-model="statusFilter" class="input !w-auto min-w-28 flex-1 text-xs sm:flex-none" :aria-label="t('keywordRules.filterStatus')"><option value="">{{ t('keywordRules.allStates') }}</option><option value="enabled">{{ t('keywordRules.enabled') }}</option><option value="paused">{{ t('keywordRules.paused') }}</option></select><select v-model="actionFilter" class="input !w-auto min-w-28 flex-1 text-xs sm:flex-none" :aria-label="t('keywordRules.action')"><option value="">{{ t('keywordRules.allActions') }}</option><option v-for="action in ['reply', 'inject', 'block']" :key="action" :value="action">{{ t(`keywordRules.actions.${action}`) }}</option></select><select v-model="modeFilter" class="input !w-auto min-w-28 flex-1 text-xs sm:flex-none" :aria-label="t('keywordRules.matchMode')"><option value="">{{ t('keywordRules.allModes') }}</option><option v-for="mode in ['exact', 'contains', 'word', 'prefix', 'suffix', 'regex']" :key="mode" :value="mode">{{ t(`keywordRules.modes.${mode}`) }}</option></select><select v-model="categoryFilter" class="input !w-auto min-w-28 flex-1 text-xs sm:flex-none" :aria-label="t('keywordRules.category')"><option value="">{{ t('keywordRules.allCategories') }}</option><option v-for="category in categories" :key="category" :value="category">{{ category }}</option></select><p class="ml-auto text-xs text-gray-400">{{ t('keywordRules.filteredCount', { count: filtered.length }) }}</p></div>
           </div>
           <div class="grid min-h-[520px] lg:grid-cols-[310px_minmax(0,1fr)]">
@@ -32,6 +32,7 @@
         <div ref="testPanel" class="scroll-mt-8"><KeywordRuleTester :policy="policy" :selected-rule-id="selectedID" /></div>
         <p class="text-center text-xs text-gray-400"><a href="/admin/conversation-archives" class="text-primary-600 hover:underline">{{ t('keywordRules.viewConversations') }}</a> · {{ t('keywordRules.recordHint') }}</p>
       </template>
+      <KeywordAIDialog v-if="showAI" :target="selectedRule" @close="showAI = false" @apply="applyAI" />
       <KeywordImportDialog v-if="showImport" :target-name="selectedRule?.name" :preserve-whitespace="selectedRule?.match_mode === 'regex'" @close="showImport = false" @apply="applyImport" />
     </div>
   </AppLayout>
@@ -43,13 +44,15 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import KeywordRuleEditor from '@/components/keyword-rules/KeywordRuleEditor.vue'
 import KeywordImportDialog from '@/components/keyword-rules/KeywordImportDialog.vue'
+import KeywordAIDialog from '@/components/keyword-rules/KeywordAIDialog.vue'
+import { applyKeywordAISelection, KeywordAIError, type KeywordAISelection } from '@/utils/keywordAI'
 import KeywordRuleTester from '@/components/keyword-rules/KeywordRuleTester.vue'
 import { apiClient } from '@/api/client'
 import { getKeywordRules, saveKeywordRules, type KeywordPolicy, type KeywordRule } from '@/api/admin/keywordRules'
 import { copyPolicy, createKeywordRule, deduplicateKeywords, ruleID, validateKeywordPolicy, type KeywordImport } from '@/utils/keywordRules'
 const { t } = useI18n()
 const policy = ref<KeywordPolicy | null>(null), saved = ref<KeywordPolicy | null>(null), selectedID = ref(''), groups = ref<{ id: number; name: string }[]>([])
-const loading = ref(true), saving = ref(false), error = ref(''), notice = ref(''), showImport = ref(false)
+const loading = ref(true), saving = ref(false), error = ref(''), notice = ref(''), showImport = ref(false), showAI = ref(false)
 const query = ref(''), searchScope = ref('all'), actionFilter = ref(''), modeFilter = ref(''), statusFilter = ref(''), categoryFilter = ref(''), page = ref(0)
 const editorPanel = ref<HTMLElement | null>(null), testPanel = ref<HTMLElement | null>(null)
 let loadVersion = 0
@@ -59,7 +62,7 @@ const categories = computed(() => [...new Set(policy.value?.rules.map(rule => ru
 const stats = computed(() => [{ label: 'totalRules', value: policy.value?.rules.length ?? 0 }, { label: 'totalKeywords', value: policy.value?.rules.reduce((sum, rule) => sum + rule.keywords.length, 0) ?? 0 }, { label: 'replyRules', value: policy.value?.rules.filter(rule => rule.action === 'reply').length ?? 0 }, { label: 'injectionRules', value: policy.value?.rules.filter(rule => rule.action === 'inject').length ?? 0 }])
 const filtered = computed(() => (policy.value?.rules ?? []).filter(rule => {
   if ((actionFilter.value && rule.action !== actionFilter.value) || (modeFilter.value && rule.match_mode !== modeFilter.value) || (categoryFilter.value && rule.category !== categoryFilter.value) || (statusFilter.value && rule.enabled !== (statusFilter.value === 'enabled'))) return false
-  const fields: Record<string, string> = { name: rule.name, keywords: rule.keywords.join('\n'), reply: rule.reply, injection: rule.injection }
+  const fields: Record<string, string> = { name: rule.name + '\n' + (rule.description || ''), keywords: rule.keywords.join('\n'), reply: rule.reply, injection: rule.injection }
   const text = (searchScope.value === 'all' ? Object.values(fields).join('\n') + '\n' + rule.category : fields[searchScope.value] ?? '').toLowerCase()
   return query.value.toLowerCase().trim().split(/\s+/).filter(Boolean).every(term => text.includes(term))
 }).sort((a, b) => a.priority - b.priority))
@@ -118,6 +121,14 @@ function applyImport(value: KeywordImport & { replace: boolean }) {
     if (selectedRule.value) selectedRule.value.keywords = deduplicateKeywords([...selectedRule.value.keywords, ...value.keywords], selectedRule.value.case_sensitive || selectedRule.value.match_mode === 'regex', selectedRule.value.match_mode === 'regex')
   }
   showImport.value = false; notice.value = t('keywordRules.imported'); void scrollEditor()
+}
+function applyAI(selection: KeywordAISelection) {
+  if (!policy.value) return
+  try {
+    const next = applyKeywordAISelection(policy.value, selection)
+    policy.value = next; selectedID.value = selection.targetId || next.rules[next.rules.length - selection.rules.length]?.id || selectedID.value
+    showAI.value = false; error.value = ''; notice.value = t('keywordRules.aiApplied'); void scrollEditor()
+  } catch (failure) { error.value = t(`keywordRules.${failure instanceof KeywordAIError ? failure.key : 'aiInvalidOutput'}`); showAI.value = false }
 }
 function exportRules() {
   if (!policy.value) return

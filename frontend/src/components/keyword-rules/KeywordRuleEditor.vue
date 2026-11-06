@@ -9,6 +9,7 @@
         <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('keywordRules.name') }}<input v-model="model.name" class="input mt-2 w-full" maxlength="100" :placeholder="t('keywordRules.namePlaceholder')" /></label>
         <label class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ t('keywordRules.category') }}<input v-model="model.category" class="input mt-2 w-full" maxlength="60" :placeholder="t('keywordRules.categoryPlaceholder')" /></label>
       </div>
+      <label class="block text-xs font-medium text-gray-500">{{ t('keywordRules.ruleDescription') }}<textarea v-model="model.description" class="input mt-2 min-h-20 w-full resize-y text-sm leading-6" maxlength="2000" :placeholder="t('keywordRules.ruleDescriptionPlaceholder')" /></label>
       <div>
         <div class="mb-2 flex flex-wrap items-center justify-between gap-2"><label for="rule-keywords" class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ t('keywordRules.keywords') }} <span class="ml-1 text-xs font-normal text-gray-400">{{ model.keywords.length.toLocaleString() }}</span></label><button type="button" class="text-xs font-medium text-primary-600 hover:underline" @click="$emit('import')">{{ t('keywordRules.bulkAdd') }}</button></div>
         <textarea id="rule-keywords" v-model="keywordText" class="input min-h-36 w-full resize-y font-mono text-sm leading-6" :placeholder="t('keywordRules.keywordsPlaceholder')" />

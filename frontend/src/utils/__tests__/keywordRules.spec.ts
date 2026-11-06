@@ -18,7 +18,7 @@ describe('keyword library import and validation', () => {
   })
   it('roundtrips exported rules including exclusions, scope and injection', () => {
     const rule = createKeywordRule('开发规则')
-    Object.assign(rule, { keywords: ['code', 'multi\nline'], exclude_keywords: ['skip'], action: 'inject', injection: 'System instructions', group_ids: [3], models: ['alias'], injection_position: 'prepend' })
+    Object.assign(rule, { description: '具体词组的适用说明', keywords: ['code', 'multi\nline'], exclude_keywords: ['skip'], action: 'inject', injection: 'System instructions', group_ids: [3], models: ['alias'], injection_position: 'prepend' })
     const json = JSON.stringify({ version: 1, enabled: true, rules: [rule] })
     expect(parseKeywordImport(json, 'json', 'rules').rules).toEqual([rule])
     expect(parseKeywordImport(json, 'json', 'keywords').keywords).toEqual(rule.keywords)
