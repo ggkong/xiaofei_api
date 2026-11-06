@@ -47,7 +47,7 @@
         </article>
       </section>
     </div>
-    <template #footer><p class="mr-auto text-xs leading-5 text-gray-500">{{ t(task === 'new' ? 'keywordRules.aiDraftHint' : 'keywordRules.aiExpandDraftHint') }}</p><button class="btn btn-secondary" @click="emit('close')">{{ t('common.cancel') }}</button><button class="btn btn-primary" :disabled="loading || !selectionCount" @click="apply">{{ t('keywordRules.aiApply', { count: selectionCount }) }}</button></template>
+    <template #footer><div class="flex w-full flex-wrap items-center justify-end gap-3"><p class="w-full text-xs leading-5 text-gray-500 sm:mr-auto sm:w-auto sm:max-w-md">{{ t(task === 'new' ? 'keywordRules.aiDraftHint' : 'keywordRules.aiExpandDraftHint') }}</p><button class="btn btn-secondary" @click="emit('close')">{{ t('common.cancel') }}</button><button class="btn btn-primary" :disabled="loading || !selectionCount" @click="apply">{{ t('keywordRules.aiApply', { count: selectionCount }) }}</button></div></template>
   </BaseDialog>
 </template>
 
