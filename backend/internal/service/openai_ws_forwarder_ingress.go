@@ -302,6 +302,13 @@ func (s *OpenAIGatewayService) ProxyResponsesWebSocketFromClient(
 				)
 			}
 		}
+		if turn > 1 && hooks != nil && hooks.TransformRequest != nil {
+			transformed, transformErr := hooks.TransformRequest(turn, normalized, originalModel)
+			if transformErr != nil {
+				return openAIWSClientPayload{}, transformErr
+			}
+			normalized = transformed
+		}
 		promptCacheKey := strings.TrimSpace(values[2].String())
 		previousResponseID := strings.TrimSpace(values[3].String())
 		previousResponseIDKind := ClassifyOpenAIPreviousResponseIDKind(previousResponseID)

@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 // startPassthroughHookRecordingServer 与 startPassthroughLifecycleServer 相同，
@@ -72,6 +73,15 @@ func TestPassthroughIngressFollowUpCallsBeforeTurnAfterBeforeRequest(t *testing.
 	var callbacks []string
 	afterTurnCalls := 0
 	hooks := &OpenAIWSIngressHooks{
+		TransformRequest: func(turn int, body []byte, model string) ([]byte, error) {
+			hooksMu.Lock()
+			callbacks = append(callbacks, "transform")
+			hooksMu.Unlock()
+			if turn != 2 || model != "gpt-5.1" {
+				return nil, errors.New("wrong transform scope")
+			}
+			return sjson.SetBytes(body, "instructions", "Injected before forwarding")
+		},
 		BeforeRequest: func(int, []byte, string) error {
 			hooksMu.Lock()
 			callbacks = append(callbacks, "before_request")
@@ -111,7 +121,9 @@ func TestPassthroughIngressFollowUpCallsBeforeTurnAfterBeforeRequest(t *testing.
 	err = clientConn.Write(writeCtx, coderws.MessageText, []byte(`{"type":"response.create","model":"gpt-5.1"}`))
 	cancelWrite()
 	require.NoError(t, err)
-	require.Equal(t, "response.create", gjson.GetBytes(requirePassthroughUpstreamWrite(t, upstream, time.Second), "type").String())
+	forwarded := requirePassthroughUpstreamWrite(t, upstream, time.Second)
+	require.Equal(t, "response.create", gjson.GetBytes(forwarded, "type").String())
+	require.Equal(t, "Injected before forwarding", gjson.GetBytes(forwarded, "instructions").String())
 	upstream.Send(`{"type":"response.completed","response":{"id":"resp_pricing_2","model":"gpt-5.1","usage":{"input_tokens":1,"output_tokens":1}}}`)
 	event, err = readPassthroughLifecycleFrame(t, clientConn, 3*time.Second)
 	require.NoError(t, err)
@@ -122,7 +134,7 @@ func TestPassthroughIngressFollowUpCallsBeforeTurnAfterBeforeRequest(t *testing.
 	gotAfter := afterTurnCalls
 	hooksMu.Unlock()
 
-	require.Equal(t, []string{"before_request", "before_turn"}, gotCallbacks)
+	require.Equal(t, []string{"transform", "before_request", "before_turn"}, gotCallbacks)
 	require.Equal(t, 2, gotAfter)
 }
 

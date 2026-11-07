@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/keywordrules"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -69,6 +70,11 @@ func (h *OpenAIGatewayHandler) checkSecurityAuditStage(c *gin.Context, reqLog *z
 func runSecurityAudit(c *gin.Context, reqLog *zap.Logger, coordinator *securityaudit.Coordinator, legacy *service.ContentModerationService, apiKey *service.APIKey, subject middleware2.AuthSubject, protocol, model string, body []byte, stage string) *securityaudit.Decision {
 	if c == nil || c.Request == nil {
 		return nil
+	}
+	if original, ok := c.Get(keywordrules.ContextOriginalBodyKey); ok {
+		if bytes, valid := original.([]byte); valid {
+			body = bytes
+		}
 	}
 	cacheCompletion := cachesSecurityAuditCompletion(stage)
 	if cacheCompletion {

@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/Wei-Shaw/sub2api/internal/conversationarchive"
+	"github.com/Wei-Shaw/sub2api/internal/keywordrules"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -129,11 +130,21 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 			if requestSnapshot != nil {
 				req = requestSnapshot
 			}
+			requestTruncated := request.truncated
+			if effective, ok := c.Get(keywordrules.ContextEffectiveBodyKey); ok {
+				if data, valid := effective.([]byte); valid {
+					req = conversationarchive.RequestSnapshot(data, limit)
+					requestTruncated = requestTruncated || len(data) > limit
+				}
+			}
 			var fields struct {
 				Model  string `json:"model"`
 				Stream bool   `json:"stream"`
 			}
 			_ = json.Unmarshal(req, &fields)
+			if public, ok := service.RequestedPublicModelFromContext(c.Request.Context()); ok {
+				fields.Model = public
+			}
 			if !utf8.ValidString(fields.Model) {
 				fields.Model = ""
 			}
@@ -173,11 +184,15 @@ func ConversationArchive(store *conversationarchive.Store) gin.HandlerFunc {
 			if conversationarchive.BlockedResponse(output) {
 				source = "blocked"
 			}
-			output = conversationarchive.AnnotateResponse(output, conversationarchive.ModelMetadata{UpstreamModel: upstream, ResponseModel: reported, Conflict: conflict, Source: source}, writer.Header().Get("X-Sub2API-Keyword-Reply") == "true")
+			var hits []keywordrules.Hit
+			if value, ok := c.Get(keywordrules.ContextHitsKey); ok {
+				hits, _ = value.([]keywordrules.Hit)
+			}
+			output = conversationarchive.AnnotateResponse(output, conversationarchive.ModelMetadata{KeywordRules: hits, UpstreamModel: upstream, ResponseModel: reported, Conflict: conflict, Source: source}, writer.Header().Get("X-Sub2API-Keyword-Reply") == "true")
 			r := conversationarchive.Record{RequestID: uuid.NewString(), UserID: &userID, APIKeyID: &keyID,
 				SessionID: service.ExtractClientSessionID(c), Endpoint: c.Request.URL.Path, Model: fields.Model,
 				Stream: stream || fields.Stream, HTTPStatus: httpStatus, Status: status, RequestBody: req, ResponseBody: output,
-				Truncated: request.truncated || responseTruncated, DurationMS: time.Since(started).Milliseconds(), CreatedAt: started}
+				Truncated: requestTruncated || responseTruncated, DurationMS: time.Since(started).Milliseconds(), CreatedAt: started}
 			r.PromptHash = promptHash
 			if key.User != nil {
 				r.UserName, r.UserEmail = key.User.Username, key.User.Email
