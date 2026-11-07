@@ -1,0 +1,39 @@
+#!/usr/bin/python3
+"""Publish enabled administrator-owned public keys as restricted SSH entries."""
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import tempfile
+
+if os.geteuid() != 0:
+    raise SystemExit('Run as root')
+with open('/etc/sub2api-archive.json', encoding='utf-8') as stream:
+    config = json.load(stream)
+container = config['container']
+if not re.fullmatch('[a-zA-Z0-9_.-]{1,100}', container):
+    raise SystemExit('Invalid archive container')
+result = subprocess.check_output(['/usr/bin/docker', 'exec', container, '/app/archive-maintenance', 'local-keys'], timeout=20)
+devices = json.loads(result)
+lines = []
+for device in devices:
+    device_id, key = device['id'], device['public_key']
+    if not re.fullmatch('[0-9a-f]{64}', device_id) or not re.fullmatch(r'ssh-ed25519 [A-Za-z0-9+/]+={0,3}', key):
+        raise SystemExit('Invalid archive public key')
+    lines.append('restrict,command="sudo -n /usr/local/libexec/sub2api-archive-sync ' + device_id + '" ' + key + '\n')
+path = Path('/var/lib/sub2api-archive/authorized_keys')
+content = ''.join(lines).encode('ascii')
+if path.exists() and path.read_bytes() == content:
+    raise SystemExit(0)
+fd, temporary = tempfile.mkstemp(prefix='.keys-', dir=path.parent)
+try:
+    with os.fdopen(fd, 'wb') as stream:
+        stream.write(content)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.chmod(temporary, 0o644)
+    os.replace(temporary, path)
+finally:
+    if os.path.exists(temporary):
+        os.unlink(temporary)

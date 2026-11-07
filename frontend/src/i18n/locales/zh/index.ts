@@ -1,3 +1,4 @@
+import archiveLocal from './archiveLocal'
 import adminAccessKeys from './adminAccessKeys'
 import keywordRules from './keywordRules'
 import landing from './landing'
@@ -9,6 +10,7 @@ import admin from './admin'
 import misc from './misc'
 
 export default {
+  archiveLocal,
   adminAccessKeys,
   keywordRules,
   ...landing,

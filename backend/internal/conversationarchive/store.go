@@ -77,6 +77,7 @@ type Record struct {
 	BlockedCount    int64              `json:"blocked_count,omitempty"`
 	AutoReplyCount  int64              `json:"auto_reply_count,omitempty"`
 	KeywordRules    []keywordrules.Hit `json:"keyword_rules,omitempty"`
+	LocalArchive    *LocalReference    `json:"local_archive,omitempty"`
 	storageVersion  int
 }
 
@@ -190,15 +191,22 @@ func (s *Store) Save(ctx context.Context, r *Record) error {
 
 const metadataColumns = `id,request_id,user_id,api_key_id,session_id,endpoint,model,stream,http_status,status,truncated,duration_ms,created_at,expires_at`
 
-var recordColumns = "c." + strings.ReplaceAll(metadataColumns, ",", ",c.") + `,COALESCE(NULLIF(c.user_name_snapshot,''),u.username,''),COALESCE(NULLIF(c.user_email_snapshot,''),u.email,''),c.request_body,c.response_body,c.storage_version,c.conversation_key,c.group_source`
+var recordColumns = "c." + strings.ReplaceAll(metadataColumns, ",", ",c.") + `,COALESCE(NULLIF(c.user_name_snapshot,''),u.username,''),COALESCE(NULLIF(c.user_email_snapshot,''),u.email,''),c.request_body,c.response_body,c.storage_version,c.conversation_key,c.group_source,c.local_archive_device,c.local_archive_hash,c.local_archived_at,c.local_archive_bytes`
 
 type scanner interface{ Scan(...any) error }
 
 func scanRecord(row scanner, detail bool) (Record, error) {
 	var r Record
+	var local LocalReference
+	var archivedAt *time.Time
 	args := []any{&r.ID, &r.RequestID, &r.UserID, &r.APIKeyID, &r.SessionID, &r.Endpoint, &r.Model, &r.Stream, &r.HTTPStatus, &r.Status, &r.Truncated, &r.DurationMS, &r.CreatedAt, &r.ExpiresAt}
 	args = append(args, &r.UserName, &r.UserEmail, &r.RequestBody, &r.ResponseBody, &r.storageVersion, &r.ConversationKey, &r.GroupSource)
+	args = append(args, &local.DeviceID, &local.Digest, &archivedAt, &local.OriginalBytes)
 	err := row.Scan(args...)
+	if local.DeviceID != "" && archivedAt != nil {
+		local.ArchivedAt = *archivedAt
+		r.LocalArchive = &local
+	}
 	if err == nil {
 		meta := gjson.GetBytes(r.ResponseBody, "_sub2api_archive")
 		if r.storageVersion == 1 {
@@ -263,6 +271,10 @@ func (s *Store) Get(ctx context.Context, id int64) (Record, error) {
 		return Record{}, errors.New("archive unavailable")
 	}
 	record, err := scanRecord(s.db.QueryRowContext(ctx, `SELECT `+recordColumns+` FROM conversation_archives c LEFT JOIN users u ON u.id=c.user_id WHERE c.id=$1 AND c.expires_at>NOW()`, id), true)
+	if record.LocalArchive != nil {
+		record.RequestBody, record.ResponseBody = nil, nil
+		return record, err
+	}
 	if err != nil || record.storageVersion == 0 {
 		return record, err
 	}
@@ -314,7 +326,7 @@ func (s *Store) PurgeExpired(ctx context.Context) error {
 	if _, err = tx.ExecContext(ctx, `DELETE FROM conversation_archives WHERE id IN (SELECT id FROM conversation_archives WHERE expires_at<=NOW() ORDER BY expires_at LIMIT 500)`); err != nil {
 		return err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT hash FROM conversation_archive_blocks ORDER BY last_checked_at,hash LIMIT 500`)
+	rows, err := tx.QueryContext(ctx, `SELECT hash FROM conversation_archive_blocks WHERE last_checked_at<=NOW() ORDER BY last_checked_at,hash LIMIT 500`)
 	if err != nil {
 		return err
 	}
