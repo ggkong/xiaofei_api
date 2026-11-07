@@ -47,7 +47,7 @@ func Connect(ctx context.Context, configDir string, c Config) (*SSHRemote, error
 		return nil, err
 	}
 	_ = connection.SetDeadline(time.Now().Add(30 * time.Second))
-	sshConnection, channels, requests, err := ssh.NewClientConn(connection, c.Host, &ssh.ClientConfig{User: "sub2api-archive", Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)}, HostKeyCallback: ssh.FixedHostKey(pinned), Timeout: 20 * time.Second})
+	sshConnection, channels, requests, err := ssh.NewClientConn(connection, c.Host, &ssh.ClientConfig{User: "sub2api-archive", Auth: []ssh.AuthMethod{ssh.PublicKeys(signer)}, HostKeyCallback: ssh.FixedHostKey(pinned), HostKeyAlgorithms: []string{ssh.KeyAlgoED25519}, Timeout: 20 * time.Second})
 	if err != nil {
 		_ = connection.Close()
 		return nil, errors.New("encrypted archive connection failed: check pairing and server identity")
