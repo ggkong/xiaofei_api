@@ -66,7 +66,27 @@ jobs:
         working-directory: backend
         env:
           ARCHIVE_TEST_DSN: postgres://postgres@127.0.0.1:5432/archive_test?sslmode=disable
-        run: go test -count=1 ./internal/conversationarchive ./internal/server/routes -run 'TestStorePostgresLifecycle|TestConversationArchiveHTTPPostgresLifecycle'
+        run: go test -count=1 ./internal/conversationarchive ./internal/server/routes -run 'TestStorePostgresLifecycle|TestConversationArchiveHTTPPostgresLifecycle|TestLocalArchivePostgresVerifiedMigration'
+
+  archive-desktop-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+      - name: Test Windows storage and protected identity
+        working-directory: backend
+        run: go test ./internal/archivewire ./internal/localarchive ./cmd/archive-desktop
+      - name: Validate PowerShell installer syntax
+        shell: pwsh
+        run: |
+          $parseErrors = $null
+          Get-ChildItem deploy/archive-desktop/*.ps1 | ForEach-Object {
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$parseErrors)
+            if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+          }
 
   frontend:
     runs-on: ubuntu-latest

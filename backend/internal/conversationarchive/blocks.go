@@ -306,7 +306,7 @@ func (s *Store) ExpandExisting(ctx context.Context, limit int) (int, error) {
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock_shared($1)`, blockGCAdvisoryLock); err != nil {
 		return 0, err
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT id,request_body,response_body FROM conversation_archives WHERE storage_version=1 ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED`, limit)
+	rows, err := tx.QueryContext(ctx, `SELECT id,request_body,response_body FROM conversation_archives WHERE storage_version=1 AND local_archive_device='' ORDER BY id LIMIT $1 FOR UPDATE SKIP LOCKED`, limit)
 	if err != nil {
 		return 0, err
 	}

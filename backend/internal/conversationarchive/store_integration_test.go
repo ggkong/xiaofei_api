@@ -54,6 +54,13 @@ func TestStorePostgresLifecycle(t *testing.T) {
 	if _, err = db.Exec(string(blocksMigration)); err != nil {
 		t.Fatal(err)
 	}
+	devicesMigration, err := os.ReadFile("../../migrations/251_conversation_archive_devices.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(string(devicesMigration)); err != nil {
+		t.Fatal(err)
+	}
 	store := New(db, Options{Enabled: true, RetentionDays: 30})
 	baseTime := time.Now().UTC().Truncate(time.Second)
 	u, k := int64(1), int64(11)

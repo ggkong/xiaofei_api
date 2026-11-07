@@ -11,12 +11,14 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <span v-if="captureEnabled === true && !capturePaused" class="mr-2 hidden items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 sm:inline-flex"><span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />{{ retentionDays === 0 ? t('conversationArchive.permanentActive') : t('conversationArchive.captureActive') }}</span>
+          <button class="btn btn-secondary" :aria-expanded="showLocal" @click="showLocal = !showLocal">{{ t('archiveLocal.title') }}</button>
           <button class="btn btn-secondary" :aria-expanded="showStorage" @click="showStorage = !showStorage">{{ t('conversationArchive.storageTitle') }}</button>
           <button class="btn btn-secondary" :disabled="loading" @click="load">{{ t('conversationArchive.refresh') }}</button>
           <a href="/admin/keyword-rules" class="btn btn-primary">{{ t('conversationArchive.keywords') }}</a>
         </div>
       </header>
 
+      <ArchiveLocalDevices v-if="showLocal" @close="showLocal = false" />
       <ConversationArchiveStorage v-if="showStorage" @close="showStorage = false" @saved="load" />
       <div v-if="captureEnabled === false" class="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{{ t('conversationArchive.disabled') }}</div>
       <div v-if="capturePaused" class="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">{{ t('conversationArchive.capacityPaused') }}</div>
@@ -100,14 +102,16 @@
         <div class="space-y-5 p-5" role="tabpanel">
           <div v-if="detail.keyword_rules?.length" class="flex flex-wrap items-center gap-2 rounded-xl bg-primary-50 px-3 py-3 text-xs dark:bg-primary-950"><span class="font-medium text-primary-700 dark:text-primary-300">{{ t('keywordRules.matchedRules') }}</span><span v-for="hit in detail.keyword_rules" :key="hit.rule_id" class="rounded-md bg-white px-2 py-1 text-gray-600 dark:bg-gray-900 dark:text-gray-300">{{ hit.rule_name }} · {{ t(`keywordRules.actions.${hit.action}`) }}</span></div>
           <p v-if="detail.truncated" class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:bg-amber-950 dark:text-amber-300">{{ t('conversationArchive.limitNotice') }}</p>
-          <template v-if="detailTab === 'exchange'">
+          <p v-if="detail.local_archive" class="rounded-xl border border-primary-100 bg-primary-50 p-4 text-sm leading-7 text-primary-800 dark:border-primary-900 dark:bg-primary-950 dark:text-primary-200">{{ t('archiveLocal.localNotice') }}</p>
+          <div v-if="detail.local_archive && detailTab === 'exchange'" class="grid gap-4 sm:grid-cols-2"><p class="whitespace-pre-wrap break-words rounded-xl border border-gray-200 p-4 text-sm leading-7 dark:border-gray-800">{{ detail.prompt_preview }}</p><p class="whitespace-pre-wrap break-words rounded-xl bg-primary-50 p-4 text-sm leading-7 dark:bg-primary-950">{{ detail.response_preview }}</p></div>
+          <template v-else-if="detailTab === 'exchange'">
             <div class="grid gap-5 lg:grid-cols-2">
               <div class="rounded-xl border border-gray-200 p-4 dark:border-gray-800"><h3 class="mb-3 text-xs font-semibold text-gray-500">{{ t('conversationArchive.question') }}</h3><p v-for="(message, index) in inputMessages" :key="index" class="max-h-96 overflow-auto whitespace-pre-wrap break-words text-sm leading-7 text-gray-900 dark:text-gray-100">{{ message.text }}</p><p v-if="!inputMessages.length" class="text-sm text-gray-400">{{ detail.prompt_preview || t('conversationArchive.promptOmitted') }}</p></div>
               <div class="rounded-xl border border-primary-100 bg-primary-50/40 p-4 dark:border-primary-900 dark:bg-primary-950/20"><h3 class="mb-3 text-xs font-semibold text-primary-600 dark:text-primary-400">{{ detail.auto_reply ? t('conversationArchive.automaticReply') : t('conversationArchive.output') }}</h3><template v-for="(message, index) in outputMessages" :key="index"><details v-if="message.kind === 'tool'" class="text-xs text-gray-500"><summary class="cursor-pointer py-2">{{ message.name || t('conversationArchive.toolCall') }}</summary><pre class="max-h-80 overflow-auto whitespace-pre-wrap break-words leading-6">{{ message.text }}</pre></details><p v-else class="max-h-96 overflow-auto whitespace-pre-wrap break-words text-sm leading-7 text-gray-900 dark:text-gray-100">{{ message.text }}</p></template><p v-if="!outputMessages.length" class="text-sm text-gray-400">{{ detail.blocked ? t('conversationArchive.blockMessage') : detail.status === 'error' ? t('conversationArchive.errorReply') : t('conversationArchive.toolReply') }}</p></div>
             </div>
           </template>
-          <template v-else-if="detailTab === 'context'"><p class="text-xs leading-5 text-gray-500">{{ t('conversationArchive.contextHint') }}</p><ConversationContext :key="detail.id" :messages="contextMessages" /></template>
-          <div v-else class="space-y-4">
+          <template v-else-if="detailTab === 'context' && !detail.local_archive"><p class="text-xs leading-5 text-gray-500">{{ t('conversationArchive.contextHint') }}</p><ConversationContext :key="detail.id" :messages="contextMessages" /></template>
+          <div v-else-if="detailTab === 'models'" class="space-y-4">
             <p v-if="detail.auto_reply" class="rounded-xl bg-primary-50 p-4 text-sm text-primary-700 dark:bg-primary-950 dark:text-primary-300">{{ t('conversationArchive.localReplyModelHint') }}</p>
             <dl class="grid gap-4 sm:grid-cols-2"><div v-for="field in modelFields" :key="field.label" class="rounded-xl border border-gray-200 p-4 dark:border-gray-800"><dt class="text-xs text-gray-500">{{ t(`conversationArchive.${field.label}`) }}</dt><dd class="mt-2 break-all font-mono text-sm text-gray-900 dark:text-gray-100">{{ field.value || t('conversationArchive.notRecorded') }}</dd></div></dl>
             <p class="text-xs leading-5 text-gray-500">{{ t('conversationArchive.modelProvenanceHint') }}</p><p v-if="detail.model_conflict" class="text-xs text-amber-700 dark:text-amber-300">{{ t('conversationArchive.modelConflict') }}</p>
@@ -123,6 +127,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import ArchiveLocalDevices from '@/components/admin/ArchiveLocalDevices.vue'
 import ConversationArchiveStorage from '@/components/admin/ConversationArchiveStorage.vue'
 import ConversationContext from '@/components/admin/ConversationContext.vue'
 import type { ArchivePage, ArchiveRecord } from '@/api/admin/conversationArchive'
@@ -131,6 +136,7 @@ import { archiveDateRange, archiveRequestMessages, archiveResponseContext, archi
 
 const { t, locale } = useI18n()
 const showStorage = ref(false)
+const showLocal = ref(new URLSearchParams(window.location.search).has('archive_key'))
 const retentionDays = ref<number | null>(null)
 const viewMode = ref<'groups' | 'calls'>('groups')
 const detailTab = ref<'exchange' | 'context' | 'models'>('exchange')

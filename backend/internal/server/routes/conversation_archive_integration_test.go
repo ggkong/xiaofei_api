@@ -70,6 +70,13 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 	if _, err = db.Exec(string(blocksMigration)); err != nil {
 		t.Fatal(err)
 	}
+	devicesMigration, err := os.ReadFile("../../../migrations/251_conversation_archive_devices.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(string(devicesMigration)); err != nil {
+		t.Fatal(err)
+	}
 	store := conversationarchive.New(db, conversationarchive.Options{Enabled: true, MaxBytes: 4096, RetentionDays: 30})
 	chunk := "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"hello\"}}]}\n\n"
 	reply := strings.Repeat(chunk, 100) + "data: [DONE]\n\n"
@@ -132,6 +139,9 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 		case "Bearer test-admin":
 			c.Set(string(middleware.ContextKeyUserRole), "admin")
 			c.Set("auth_method", "jwt")
+		case "Bearer test-admin-key":
+			c.Set(string(middleware.ContextKeyUserRole), "admin")
+			c.Set("auth_method", "api_key")
 		case "Bearer test-member":
 			c.Set(string(middleware.ContextKeyUserRole), "user")
 			c.Set("auth_method", "jwt")
@@ -186,6 +196,26 @@ func TestConversationArchiveHTTPPostgresLifecycle(t *testing.T) {
 		_ = response.Body.Close()
 		if response.StatusCode != tc.status {
 			t.Fatalf("%s: got %d want %d", tc.token, response.StatusCode, tc.status)
+		}
+	}
+	for _, token := range []string{"", "test-member", "test-admin-key"} {
+		for _, method := range []string{"GET", "POST", "PUT"} {
+			path := "/api/v1/admin/conversation-archives/devices"
+			if method == "PUT" {
+				path += "/" + strings.Repeat("a", 64)
+			}
+			r, _ := http.NewRequest(method, server.URL+path, strings.NewReader(`{}`))
+			if token != "" {
+				r.Header.Set("Authorization", "Bearer "+token)
+			}
+			res, err := client.Do(r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = res.Body.Close()
+			if res.StatusCode != 401 && res.StatusCode != 403 {
+				t.Fatal("non-browser administrator could access archive device operations", method, res.StatusCode)
+			}
 		}
 	}
 	detailPath := server.URL + "/api/v1/admin/conversation-archives/" + strconv.FormatInt(id, 10)
