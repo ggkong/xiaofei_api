@@ -106,13 +106,13 @@ func (v *Viewer) Handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
 		if r.Host != v.Host || (r.Header.Get("Origin") != "" && r.Header.Get("Origin") != "http://"+v.Host) || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
-			http.Error(w, "Forbidden", 403)
+			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/open/") {
 			token := strings.TrimPrefix(r.URL.Path, "/open/")
 			if v.Token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(v.Token)) != 1 {
-				http.Error(w, "Forbidden", 403)
+				http.Error(w, "Forbidden", http.StatusForbidden)
 				return
 			}
 			http.SetCookie(w, &http.Cookie{Name: "archive_session", Value: v.Token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
@@ -121,7 +121,7 @@ func (v *Viewer) Handler() http.Handler {
 		}
 		cookie, err := r.Cookie("archive_session")
 		if err != nil || v.Token == "" || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(v.Token)) != 1 {
-			http.Error(w, "Open this page from the archive tool", 403)
+			http.Error(w, "Open this page from the archive tool", http.StatusForbidden)
 			return
 		}
 		if r.URL.Path == "/api/sync" && r.Method == http.MethodPost {
@@ -140,7 +140,7 @@ func (v *Viewer) Handler() http.Handler {
 			return
 		}
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", 405)
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
