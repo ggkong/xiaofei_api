@@ -27,6 +27,7 @@ func registerConversationArchiveRoutes(admin *gin.RouterGroup, store *conversati
 	archive := admin.Group("/conversation-archives")
 	// Defense in depth: only an administrator's interactive JWT, never member or scoped API keys.
 	archive.Use(middleware.AdminOnly(), func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
 		if c.GetString("auth_method") != "jwt" || adminaccess.FromContext(c.Request.Context()) != nil {
 			c.Abort()
 			response.Forbidden(c, "Administrator browser login required")
@@ -34,8 +35,12 @@ func registerConversationArchiveRoutes(admin *gin.RouterGroup, store *conversati
 		}
 		c.Next()
 	})
+	registerArchiveDeviceRoutes(archive, store)
 	archive.GET("/settings", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		// A cold statistics scan can exceed five seconds with permanent history.
+		// Keep it below the browser's 30-second timeout; subsequent reads share
+		// the store's short-lived statistics snapshot.
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
 		defer cancel()
 		info, err := store.StorageInfo(ctx)
 		if err != nil {

@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sub2API · 本地对话档案</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.js"></script></head>
+<body>
+<header><div class="brand"><span class="brand-icon">S</span><div><strong>Sub2API <span>ARCHIVE</span></strong><p>你的对话，保存在你的硬盘</p></div></div><div class="header-actions"><span class="badge">● 本地访问</span><button id="sync">立即同步</button></div></header>
+<main><section class="intro"><div><p class="eyebrow">PERSONAL CONVERSATION LIBRARY</p><h1>每一次对话，都有迹可循。</h1><p>姓名、模型、回复与上下文，在这里完整回看。</p></div><div class="metric"><strong id="count">—</strong><span>已保存调用</span></div></section>
+<section class="storage"><span class="drive">▣</span><div><strong id="directory">正在读取保存目录…</strong><p id="sync-status" role="status">读取同步状态…</p></div><span class="permanent">本地长期保留</span></section>
+<div id="error" class="error" role="alert" hidden></div>
+<section class="library"><aside><form id="search-form"><label for="search">查找对话</label><div class="search-box"><input id="search" placeholder="搜索姓名、模型、问题或回复摘要" maxlength="200"><button>搜索</button></div></form><div class="list-heading"><span>最近的调用</span><button id="reset" class="text-button" hidden>全部记录</button></div><div id="records"></div><div class="pages"><button id="prev" disabled>上一页</button><button id="next" disabled>下一页</button></div></aside>
+<article><div id="empty" class="empty"><span>⌘</span><h2>打开一段对话</h2><p>选择左侧记录，查看问题、模型回复和上下文。<br>首次使用请在管理页配对，再点击「立即同步」。</p></div><div id="detail" hidden><div class="detail-head"><div><p id="detail-time"></p><h2 id="member"></h2><span id="model" class="model"></span></div><a id="download" class="button" download>导出 JSON</a></div><nav aria-label="对话详情"><button data-tab="exchange" class="active">问题与回复</button><button data-tab="context">完整上下文</button><button data-tab="models">模型信息</button><button data-tab="raw">原始记录</button></nav><p id="limit" class="notice" hidden>这条记录在服务器捕获时有截断，归档保留的是当时实际保存的内容。</p><div id="messages"></div><div id="models" hidden></div><pre id="raw" hidden></pre><div class="detail-footer"><button id="related">查看同一会话的调用</button><span>重复上下文按调用独立保留</span></div></div></article></section>
+<footer>离线也能查阅 · 只有同步时连接服务器 · 图片、附件若仅保存了外部链接，离线时可能无法加载</footer></main>
+</body></html>

@@ -1,5 +1,6 @@
 import type { KeywordHit } from './keywordRules'
 export interface ArchiveRecord {
+	local_archive?: { device_id: string; digest: string; archived_at: string; original_bytes: number }
   id: number
   request_id: string
   user_id: number | null
@@ -33,6 +34,18 @@ export interface ArchiveRecord {
   first_at?: string
   blocked_count?: number
   auto_reply_count?: number
+}
+
+export interface ArchiveDevice {
+  id: string
+  name: string
+  public_key: string
+  enabled: boolean
+  offload_enabled: boolean
+  keep_days: number
+  confirmed_records: number
+  last_seen_at: string | null
+  created_at: string
 }
 
 export interface ArchivePage {

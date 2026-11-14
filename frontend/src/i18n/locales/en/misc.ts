@@ -19,6 +19,10 @@ export default {
 
   // Version Badge
   version: {
+    customProtected: 'Custom build · features protected',
+    customUpdateHint: 'Includes keyword rules and conversation archives. Merge upstream changes and deploy a reviewed custom image to upgrade. Online replacement and rollback to official binaries are disabled.',
+    customProject: 'View custom project',
+    upstreamRelease: 'View upstream release notes',
     currentVersion: 'Current Version',
     latestVersion: 'Latest Version',
     upToDate: "You're running the latest version.",

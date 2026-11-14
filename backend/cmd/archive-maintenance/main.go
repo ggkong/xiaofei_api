@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/archivewire"
 	"github.com/Wei-Shaw/sub2api/internal/conversationarchive"
 )
 
@@ -21,8 +22,8 @@ func env(key, fallback string) string {
 }
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "Usage: archive-maintenance stats|compact|expand|purge")
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		fmt.Fprintln(os.Stderr, "Usage: archive-maintenance stats|compact|expand|purge|local-keys|local-sync DEVICE_ID")
 		os.Exit(2)
 	}
 	dsn := url.URL{Scheme: "postgres", User: url.UserPassword(env("DATABASE_USER", "sub2api"), os.Getenv("DATABASE_PASSWORD")), Host: net.JoinHostPort(env("DATABASE_HOST", "postgres"), env("DATABASE_PORT", "5432")), Path: "/" + env("DATABASE_DBNAME", "sub2api")}
@@ -43,6 +44,18 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 	switch os.Args[1] {
+	case "local-keys":
+		devices, err := store.AuthorizedLocalKeys(ctx)
+		if err != nil || json.NewEncoder(os.Stdout).Encode(devices) != nil {
+			fail()
+		}
+	case "local-sync":
+		if len(os.Args) != 3 || !archivewire.ValidHash(os.Args[2]) {
+			fail()
+		}
+		if store.ServeLocalTransfer(ctx, os.Args[2], os.Stdin, os.Stdout) != nil {
+			fail()
+		}
 	case "stats":
 		info, err := store.StorageInfo(ctx)
 		if err != nil {

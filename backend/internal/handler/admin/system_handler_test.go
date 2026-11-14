@@ -322,3 +322,19 @@ func TestSystemHandlerGetRollbackVersionsError(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, rec.Code)
 }
+
+func TestSystemHandlerRejectsProtectedCustomUpdateAndRollback(t *testing.T) {
+	for _, operation := range []string{"update", "rollback"} {
+		t.Run(operation, func(t *testing.T) {
+			updateSvc := &systemHandlerUpdateServiceStub{performErr: service.ErrCustomBuildProtected, rollbackToErr: service.ErrCustomBuildProtected}
+			router := newSystemHandlerTestRouter(t, updateSvc, newMemoryIdempotencyRepoStub())
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/admin/system/"+operation, strings.NewReader(`{"version":"0.2.19"}`))
+			request.Header.Set("Content-Type", "application/json")
+			router.ServeHTTP(recorder, request)
+			require.Equal(t, http.StatusForbidden, recorder.Code)
+			require.Contains(t, recorder.Body.String(), "CUSTOM_BUILD_PROTECTED")
+			require.NotContains(t, recorder.Body.String(), `"need_restart":true`)
+		})
+	}
+}

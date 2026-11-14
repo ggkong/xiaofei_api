@@ -1,0 +1,15 @@
+#!/usr/bin/python3
+"""Root-owned SSH forced-command target; never interprets SSH_ORIGINAL_COMMAND."""
+import json
+import os
+import re
+import sys
+
+if os.geteuid() != 0 or len(sys.argv) != 2 or not re.fullmatch('[0-9a-f]{64}', sys.argv[1]):
+    raise SystemExit('Archive-only command rejected')
+with open('/etc/sub2api-archive.json', encoding='utf-8') as stream:
+    config = json.load(stream)
+container = config['container']
+if not re.fullmatch('[a-zA-Z0-9_.-]{1,100}', container):
+    raise SystemExit('Invalid archive container')
+os.execve('/usr/bin/docker', ['docker', 'exec', '-i', container, '/app/archive-maintenance', 'local-sync', sys.argv[1]], {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin'})
