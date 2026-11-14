@@ -19,6 +19,10 @@ export default {
 
   // Version Badge
   version: {
+    customProtected: '定制版 · 功能保护已开启',
+    customUpdateHint: '包含关键词规则与聊天归档。升级需合并官方更新后发布定制镜像；官方原版的在线覆盖和回退已关闭。',
+    customProject: '查看定制项目',
+    upstreamRelease: '查看官方更新说明',
     currentVersion: '当前版本',
     latestVersion: '最新版本',
     upToDate: '已是最新版本',

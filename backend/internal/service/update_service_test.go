@@ -62,6 +62,8 @@ func TestUpdateServicePerformUpdateNoUpdateReturnsSentinel(t *testing.T) {
 		"release",
 	)
 
+	// Exercise upstream update behavior independently of this fork's default protection.
+	svc.customBuild = false
 	err := svc.PerformUpdate(context.Background())
 
 	require.Error(t, err)
@@ -70,12 +72,14 @@ func TestUpdateServicePerformUpdateNoUpdateReturnsSentinel(t *testing.T) {
 }
 
 func newRollbackTestService(current string, releases []*GitHubRelease) *UpdateService {
-	return NewUpdateService(
+	svc := NewUpdateService(
 		&updateServiceCacheStub{},
 		&updateServiceGitHubClientStub{recentReleases: releases},
 		current,
 		"release",
 	)
+	svc.customBuild = false
+	return svc
 }
 
 func TestUpdateServiceListRollbackVersionsFiltersAndCaps(t *testing.T) {
@@ -184,4 +188,35 @@ func TestUpdateServiceRollbackToVersionAcceptsVPrefix(t *testing.T) {
 	require.Error(t, err)
 	require.NotErrorIs(t, err, ErrRollbackVersionNotAllowed)
 	require.Contains(t, err.Error(), "no compatible release found")
+}
+
+func TestCustomBuildRejectsBinaryReplacementBeforeAnyIO(t *testing.T) {
+	for _, buildType := range []string{"release", "source", "custom", ""} {
+		for _, version := range []string{"0.2.21", "0.2.21-custom.1", "dev"} {
+			t.Run(buildType+"/"+version, func(t *testing.T) {
+				// Nil clients would panic if an operation reached the network/cache. Local
+				// rollback must also stop before discovering or touching executable files.
+				svc := NewUpdateService(nil, nil, version, buildType)
+				require.ErrorIs(t, svc.PerformUpdate(context.Background()), ErrCustomBuildProtected)
+				require.ErrorIs(t, svc.RollbackToVersion(context.Background(), "0.2.19"), ErrCustomBuildProtected)
+				require.ErrorIs(t, svc.Rollback(), ErrCustomBuildProtected)
+				require.ErrorIs(t, svc.applyReleaseAssets(context.Background(), nil), ErrCustomBuildProtected)
+			})
+		}
+	}
+}
+
+func TestCustomBuildProtectionSurvivesUpdateCacheAndMatchingVersion(t *testing.T) {
+	cache := &updateServiceCacheStub{}
+	svc := NewUpdateService(cache, &updateServiceGitHubClientStub{release: &GitHubRelease{TagName: "v0.2.21", Name: "upstream"}}, "0.2.21-custom.1", "release")
+	fresh, err := svc.CheckUpdate(context.Background(), true)
+	require.NoError(t, err)
+	require.True(t, fresh.CustomBuild)
+	require.False(t, fresh.HasUpdate)
+	cached, err := svc.CheckUpdate(context.Background(), false)
+	require.NoError(t, err)
+	require.True(t, cached.CustomBuild)
+	require.True(t, cached.Cached)
+	require.Equal(t, "0.2.21-custom.1", cached.CurrentVersion)
+	require.ErrorIs(t, svc.PerformUpdate(context.Background()), ErrCustomBuildProtected)
 }

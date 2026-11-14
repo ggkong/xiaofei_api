@@ -1,6 +1,7 @@
 import archiveLocal from './archiveLocal'
 import adminAccessKeys from './adminAccessKeys'
 import keywordRules from './keywordRules'
+import mcp from './mcp'
 import landing from './landing'
 import common from './common'
 import dashboard from './dashboard'
@@ -13,6 +14,7 @@ export default {
   archiveLocal,
   adminAccessKeys,
   keywordRules,
+  mcp,
   ...landing,
   ...common,
   ...dashboard,

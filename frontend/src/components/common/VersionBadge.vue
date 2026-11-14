@@ -114,8 +114,16 @@
                 </p>
               </div>
 
+              <div v-if="customBuild" class="space-y-3" data-testid="custom-build-protection">
+                <div class="rounded-lg border border-primary-200 bg-primary-50 p-3 dark:border-primary-800 dark:bg-primary-950">
+                  <p class="text-sm font-medium text-primary-800 dark:text-primary-200">{{ t('version.customProtected') }}</p>
+                  <p class="mt-2 text-xs leading-6 text-primary-700 dark:text-primary-300">{{ t('version.customUpdateHint') }}</p>
+                </div>
+                <a href="https://github.com/ggkong/xiaofei_api" target="_blank" rel="noopener noreferrer" class="block text-center text-xs text-primary-600 hover:underline">{{ t('version.customProject') }}</a>
+                <a v-if="releaseInfo?.html_url && releaseInfo.html_url !== '#'" :href="releaseInfo.html_url" target="_blank" rel="noopener noreferrer" class="block text-center text-xs text-gray-500 hover:underline">{{ t('version.upstreamRelease') }}</a>
+              </div>
               <!-- Priority 1: Update error (must check before hasUpdate) -->
-              <div v-if="updateError" class="space-y-2">
+              <div v-else-if="updateError" class="space-y-2">
                 <div
                   class="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800/50 dark:bg-red-900/20"
                 >
@@ -676,6 +684,7 @@ const latestVersion = computed(() => appStore.latestVersion)
 const hasUpdate = computed(() => appStore.hasUpdate)
 const releaseInfo = computed(() => appStore.releaseInfo)
 const buildType = computed(() => appStore.buildType)
+const customBuild = computed(() => appStore.customBuild === true)
 
 // Update process states (local to this component)
 const updating = ref(false)
@@ -752,6 +761,7 @@ async function refreshVersion(force = true) {
 }
 
 async function handleUpdate() {
+  if (customBuild.value) return
   if (updating.value) return
 
   updating.value = true
@@ -826,6 +836,7 @@ function formatPublishedAt(publishedAt: string): string {
 }
 
 async function handleRollback() {
+  if (customBuild.value) return
   if (!isAdmin.value) return
   if (rollingBack.value || !selectedRollbackVersion.value) return
 

@@ -25,6 +25,7 @@ import (
 var (
 	ErrNoUpdateAvailable         = infraerrors.Conflict("ALREADY_UP_TO_DATE", "no update available; current version is latest")
 	ErrRollbackVersionNotAllowed = infraerrors.BadRequest("ROLLBACK_VERSION_NOT_ALLOWED", "version is not in the allowed rollback list")
+	ErrCustomBuildProtected      = infraerrors.Forbidden("CUSTOM_BUILD_PROTECTED", "This customized build must be upgraded or rolled back using a reviewed custom image; official binaries would remove keyword rules and conversation archives")
 )
 
 const (
@@ -65,6 +66,7 @@ type UpdateService struct {
 	githubClient   GitHubReleaseClient
 	currentVersion string
 	buildType      string // "source" for manual builds, "release" for CI builds
+	customBuild    bool   // This fork always uses managed images, regardless of build flags.
 }
 
 // NewUpdateService creates a new UpdateService
@@ -74,6 +76,7 @@ func NewUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, versi
 		githubClient:   githubClient,
 		currentVersion: version,
 		buildType:      buildType,
+		customBuild:    true,
 	}
 }
 
@@ -86,6 +89,7 @@ type UpdateInfo struct {
 	Cached         bool         `json:"cached"`
 	Warning        string       `json:"warning,omitempty"`
 	BuildType      string       `json:"build_type"` // "source" or "release"
+	CustomBuild    bool         `json:"custom_build"`
 }
 
 // ReleaseInfo contains GitHub release details
@@ -152,6 +156,7 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 			HasUpdate:      false,
 			Warning:        err.Error(),
 			BuildType:      s.buildType,
+			CustomBuild:    s.customBuild,
 		}, nil
 	}
 
@@ -163,6 +168,9 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 // PerformUpdate downloads and applies the update
 // Uses atomic file replacement pattern for safe in-place updates
 func (s *UpdateService) PerformUpdate(ctx context.Context) error {
+	if s.customBuild {
+		return ErrCustomBuildProtected
+	}
 	info, err := s.CheckUpdate(ctx, true)
 	if err != nil {
 		return err
@@ -179,6 +187,9 @@ func (s *UpdateService) PerformUpdate(ctx context.Context) error {
 // verifies its checksum, and atomically swaps the running binary.
 // Shared by PerformUpdate (latest) and RollbackToVersion (specific older version).
 func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []Asset) error {
+	if s.customBuild {
+		return ErrCustomBuildProtected
+	}
 	// Find matching archive and checksum for current platform
 	archiveName := s.getArchiveName()
 	var downloadURL string
@@ -281,6 +292,9 @@ func (s *UpdateService) applyReleaseAssets(ctx context.Context, releaseAssets []
 
 // Rollback restores the previous version
 func (s *UpdateService) Rollback() error {
+	if s.customBuild {
+		return ErrCustomBuildProtected
+	}
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
@@ -327,6 +341,9 @@ func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVer
 // The target must be one of the versions returned by ListRollbackVersions;
 // anything else (including the current version) is rejected.
 func (s *UpdateService) RollbackToVersion(ctx context.Context, version string) error {
+	if s.customBuild {
+		return ErrCustomBuildProtected
+	}
 	target := strings.TrimPrefix(strings.TrimSpace(version), "v")
 	if target == "" {
 		return ErrRollbackVersionNotAllowed
@@ -427,8 +444,9 @@ func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, er
 			HTMLURL:     release.HTMLURL,
 			Assets:      assets,
 		},
-		Cached:    false,
-		BuildType: s.buildType,
+		Cached:      false,
+		BuildType:   s.buildType,
+		CustomBuild: s.customBuild,
 	}, nil
 }
 
@@ -619,6 +637,7 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 		ReleaseInfo:    cached.ReleaseInfo,
 		Cached:         true,
 		BuildType:      s.buildType,
+		CustomBuild:    s.customBuild,
 	}, nil
 }
 
