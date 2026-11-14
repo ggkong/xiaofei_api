@@ -121,10 +121,25 @@ func (s *Store) StorageInfo(ctx context.Context) (StorageInfo, error) {
 	}
 	info := StorageInfo{Policy: s.Policy(ctx), FreeBytes: filesystemFreeBytes(archiveDataPath())}
 	info.CapturePaused = info.FreeBytes > 0 && info.FreeBytes < 512<<20
+	// Counting permanent archives reads large manifests. Share one bounded
+	// snapshot across visitors; policy and free-space protection stay live.
+	s.storageMu.Lock()
+	defer s.storageMu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return info, err
+	}
+	if time.Since(s.storageLoadedAt) < 30*time.Second && s.storageValue.RetentionDays == info.RetentionDays {
+		info.Records, info.LogicalBytes = s.storageValue.Records, s.storageValue.LogicalBytes
+		info.StorageBytes, info.BlockCount = s.storageValue.StorageBytes, s.storageValue.BlockCount
+		return info, nil
+	}
 	err := s.db.QueryRowContext(ctx, `SELECT count(*),COALESCE(sum(CASE WHEN storage_version=1 THEN (request_body->>'_raw_bytes')::bigint+(response_body->>'_raw_bytes')::bigint ELSE octet_length(request_body::text)+octet_length(response_body::text) END),0) FROM conversation_archives WHERE expires_at>NOW()`).Scan(&info.Records, &info.LogicalBytes)
 	if err != nil {
 		return info, err
 	}
 	err = s.db.QueryRowContext(ctx, `SELECT pg_total_relation_size('conversation_archives')+pg_total_relation_size('conversation_archive_blocks'),(SELECT count(*) FROM conversation_archive_blocks)`).Scan(&info.StorageBytes, &info.BlockCount)
+	if err == nil {
+		s.storageValue, s.storageLoadedAt = info, time.Now()
+	}
 	return info, err
 }

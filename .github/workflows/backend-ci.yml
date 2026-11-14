@@ -169,7 +169,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/custom-release/web
-          go build -p 2 -tags embed -trimpath -ldflags "-s -w -X main.Version=0.2.21-custom.1 -X main.Commit=$GITHUB_SHA -X main.BuildType=release" -o /tmp/custom-release/sub2api ./cmd/server
+          go build -p 2 -tags embed -trimpath -ldflags "-s -w -X main.Version=0.2.21-custom.2 -X main.Commit=$GITHUB_SHA -X main.BuildType=release" -o /tmp/custom-release/sub2api ./cmd/server
           go build -p 2 -trimpath -ldflags '-s -w' -o /tmp/custom-release/archive-maintenance ./cmd/archive-maintenance
           cp -a internal/web/dist/. /tmp/custom-release/web/
           go version > /tmp/custom-release/go-version.txt

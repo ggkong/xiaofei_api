@@ -96,11 +96,14 @@ type Filter struct {
 }
 
 type Store struct {
-	db             *sql.DB
-	options        Options
-	policyMu       sync.Mutex
-	policyValue    Policy
-	policyLoadedAt time.Time
+	db              *sql.DB
+	options         Options
+	policyMu        sync.Mutex
+	policyValue     Policy
+	policyLoadedAt  time.Time
+	storageMu       sync.Mutex
+	storageValue    StorageInfo
+	storageLoadedAt time.Time
 }
 
 func New(db *sql.DB, options Options) *Store {

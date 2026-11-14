@@ -37,7 +37,10 @@ func registerConversationArchiveRoutes(admin *gin.RouterGroup, store *conversati
 	})
 	registerArchiveDeviceRoutes(archive, store)
 	archive.GET("/settings", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		// A cold statistics scan can exceed five seconds with permanent history.
+		// Keep it below the browser's 30-second timeout; subsequent reads share
+		// the store's short-lived statistics snapshot.
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 20*time.Second)
 		defer cancel()
 		info, err := store.StorageInfo(ctx)
 		if err != nil {
